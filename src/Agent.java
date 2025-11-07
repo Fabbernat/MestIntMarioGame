@@ -1,12 +1,26 @@
 import game.mario.Direction;
 import game.mario.MarioGame;
+import game.mario.utils.Mario;
+import game.mario.utils.MarioState;
 import utils.State;
 
 import java.util.Random;
 
 
-public class Agent implements IAgent {
 
+public class Agent implements IAgent {
+  private final int[][] map;
+  Mario mario;
+
+  public Agent(int[][] map) {
+    this.map = map;
+    this.mario = new Mario(6, 10);
+  }
+
+  public Agent() {
+    this.map = new int[13][100];
+    this.mario = new Mario(6, 10);
+  }
   @Override
   public Direction getDirection(long remainingTime) {
     System.out.println("Hello World");
@@ -14,9 +28,25 @@ public class Agent implements IAgent {
 
     Random random = new Random();
     Direction action = new Direction(MarioGame.DIRECTIONS[random.nextInt(MarioGame.DIRECTIONS.length)]);
-    Direction action2 = new Direction(0);
-    State state = new State();
-    state.apply(action2);
+
+    State state = new State(map, mario);
+    MarioState s0 = new MarioState(state);
+
+    s0.apply(new Direction(MarioGame.DIRECTIONS[3]));
+
+    // heurisztikát készítünk?
+    double heur0 = s0.score;
+    System.out.println(action);
+    state.apply(action);
+
+    // lefuttatjuk az A* algoritmust a Mario jelenlegi helyzete alapján
+    action = AStarAlgorithm(mario);
+
     return action;
+  }
+
+  // Visszatér egy Directionnal a Mario vízszintes és függőleges sebessége alapján
+  private Direction AStarAlgorithm(Mario mario) {
+    return new Direction((int) (mario.vi + mario.vj));
   }
 }
