@@ -24,6 +24,10 @@ bin/
 
 ### VS Code ###
 .vscode/
-
 ### Mac OS ###
 .DS_Store
+
+### sajat ###
+node_modules/
+.vs/
+.idea
