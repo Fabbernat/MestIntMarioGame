@@ -12,18 +12,24 @@ import java.util.Random;
 
 public class Agent extends MarioPlayer {
 
-  // Finomhangolható paraméterek
+  // Tunable parameters
   private static final int HOLE_LOOKAHEAD = 2;
   private static final int OBSTACLE_LOOKAHEAD = 1;
   private static final int COIN_SEARCH_RADIUS = 5;
-  private static final int STUCK_HISTORY = 16; // hány pozíciót tartson meg
-  private static final double STUCK_REGION_SIZE = 6.0; // kb. hány cellányi helyen belül van "beragadva"
+  private static final int STUCK_HISTORY = 16;
+  private static final double STUCK_REGION_SIZE = 6.0;
 
   private final Queue<Double> lastPositions = new LinkedList<>();
-  private boolean escapeLeft = false; // balra menekülés állapota
-  private boolean jumpPhase = false;  // ha épp az "UP" fázisban van
+  private boolean escapeLeft = false;
+  private boolean jumpPhase = false;
   private double lastX = -1;
   private int samePosCounter = 0;
+  private int escapeTicks = 0;
+
+  // 👇 New random-left-move logic
+  private int moveCounter = 0;
+  private int leftMovesRemaining = 0;
+  private final Random rng = new Random();
 
   public Agent(int color, Random random, MarioState marioState) {
     super(color, random, marioState);
@@ -38,76 +44,96 @@ public class Agent extends MarioPlayer {
 
     updatePositionHistory(mario);
 
+    // --- 🔁 Count and trigger random left moves every 10th move ---
+    moveCounter++;
+    if (moveCounter % 10 == 0 && leftMovesRemaining == 0) {
+      // 50% chance to start left movement phase
+      if (rng.nextBoolean()) {
+        leftMovesRemaining = 4;
+      }
+    }
+
+    // --- 🌀 Handle the forced random-left sequence ---
+    if (leftMovesRemaining > 0) {
+      leftMovesRemaining--;
+      if (!isHoleBehind(map, row, col)) {
+        return new Direction(MarioGame.LEFT);
+      }
+      // If hole behind, skip left move to avoid suicide
+    }
+
     // --- 1️⃣ Stuck detection ---
     if (isStuck()) {
       escapeLeft = true;
       jumpPhase = true;
-      lastPositions.clear(); // reset history to prevent loops
+      escapeTicks = 12;
+      lastPositions.clear();
     }
 
-    // --- 2️⃣ Ha menekül balra ---
+    // --- 2️⃣ Escape mode ---
     if (escapeLeft) {
-      // először próbál ugrani
       if (jumpPhase) {
         jumpPhase = false;
         return new Direction(MarioGame.UP);
       }
-
-      // Step 2: Move left safely (avoid holes)
       if (!isHoleBehind(map, row, col)) {
+        escapeTicks--;
+        if (escapeTicks <= 0) escapeLeft = false;
         return new Direction(MarioGame.LEFT);
       } else {
-        // If there's a hole behind, abort left escape
         escapeLeft = false;
       }
     }
 
-    // --- 3️⃣ Lyuk előtte? ---
+    // --- 3️⃣ Hole detection ---
     if (isHoleAhead(map, row, col)) {
-      // If Mario is right before a hole, jump instead of walking forward
-      return jumpIfPossible();
+      if (!hasGroundBelow(map, row, col + 1)) {
+        return new Direction(MarioGame.UP);
+      }
+      return new Direction(MarioGame.UP);
     }
 
-    // --- 4️⃣ Akadály előtte? ---
+    // --- 4️⃣ Obstacle detection ---
     if (isObstacleAhead(map, row, col)) {
-      return jumpIfPossible();
+      return new Direction(MarioGame.UP);
     }
 
-    // --- 5️⃣ Érme keresés ---
+    // --- 5️⃣ Coin search ---
     Direction coinDir = moveTowardCoin(map, row, col);
     if (coinDir != null) {
       state.apply(coinDir);
       return coinDir;
     }
 
-    // --- 6️⃣ Meglepetésdoboz felett ---
+    // --- 6️⃣ Surprise blocks ---
     if (isSurpriseAbove(map, row, col)) {
       Direction up = new Direction(MarioGame.UP);
       state.apply(up);
       return up;
     }
 
-    // --- 7️⃣ Normal movement (avoid walking into holes) ---
+    // --- 7️⃣ Normal movement ---
     if (!isHoleAhead(map, row, col)) {
-      Direction right = new Direction(MarioGame.RIGHT);
-      state.apply(right);
-      return right;
+      if (hasGroundBelow(map, row, col)) {
+        Direction right = new Direction(MarioGame.RIGHT);
+        state.apply(right);
+        return right;
+      } else {
+        return new Direction(MarioGame.UP);
+      }
     } else {
-      // If there’s a hole, jump to clear it
       return new Direction(MarioGame.UP);
     }
   }
 
-  // --- Utility Methods ---
+  // --- Utility methods ---
 
   private void updatePositionHistory(Mario mario) {
-    // Track Mario's horizontal position
     lastPositions.add(mario.j);
     if (lastPositions.size() > STUCK_HISTORY) {
       lastPositions.poll();
     }
 
-    // Detect completely identical positions (like pressed against a wall)
     if (Math.abs(mario.j - lastX) < 0.05) {
       samePosCounter++;
     } else {
@@ -115,11 +141,11 @@ public class Agent extends MarioPlayer {
     }
     lastX = mario.j;
 
-    // Emergency trigger: if stuck 8 frames in exactly same position
     if (samePosCounter > 8) {
       escapeLeft = true;
       jumpPhase = true;
       samePosCounter = 0;
+      escapeTicks = 10;
     }
   }
 
@@ -127,7 +153,7 @@ public class Agent extends MarioPlayer {
     for (int d = 1; d <= HOLE_LOOKAHEAD; d++) {
       int c = col + d;
       if (c >= map[0].length) break;
-      if (map[map.length - 1][c] == MarioGame.EMPTY) return true;
+      if (!hasGroundBelow(map, row, c)) return true;
     }
     return false;
   }
@@ -136,9 +162,14 @@ public class Agent extends MarioPlayer {
     for (int d = 1; d <= HOLE_LOOKAHEAD; d++) {
       int c = col - d;
       if (c < 0) break;
-      if (map[map.length - 1][c] == MarioGame.EMPTY) return true;
+      if (!hasGroundBelow(map, row, c)) return true;
     }
     return false;
+  }
+
+  private boolean hasGroundBelow(int[][] map, int row, int col) {
+    int r = row + 1;
+    return (r < map.length && map[r][col] != MarioGame.EMPTY);
   }
 
   private boolean isObstacleAhead(int[][] map, int row, int col) {
@@ -176,13 +207,8 @@ public class Agent extends MarioPlayer {
     return false;
   }
 
-  private Direction jumpIfPossible() {
-    return new Direction(MarioGame.UP);
-  }
-
   private boolean isStuck() {
     if (lastPositions.size() < STUCK_HISTORY) return false;
-
     double min = Double.MAX_VALUE;
     double max = Double.MIN_VALUE;
     for (double x : lastPositions) {
