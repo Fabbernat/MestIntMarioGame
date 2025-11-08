@@ -22,6 +22,8 @@ public class Agent extends MarioPlayer {
   private final Queue<Double> lastPositions = new LinkedList<>();
   private boolean escapeLeft = false; // balra menekülés állapota
   private boolean jumpPhase = false;  // ha épp az "UP" fázisban van
+  private double lastX = -1;
+  private int samePosCounter = 0;
 
   public Agent(int color, Random random, MarioState marioState) {
     super(color, random, marioState);
@@ -34,12 +36,9 @@ public class Agent extends MarioPlayer {
     int row = (int) mario.i;
     int col = (int) mario.j;
 
-    // --- 1️⃣ Pozíciók frissítése és beragadás detektálása ---
-    lastPositions.add(mario.j);
-    if (lastPositions.size() > STUCK_HISTORY) {
-      lastPositions.poll();
-    }
+    updatePositionHistory(mario);
 
+    // --- 1️⃣ Stuck detection ---
     if (isStuck()) {
       escapeLeft = true;
       jumpPhase = true;
@@ -52,19 +51,20 @@ public class Agent extends MarioPlayer {
       if (jumpPhase) {
         jumpPhase = false;
         return new Direction(MarioGame.UP);
+      }
+
+      // Step 2: Move left safely (avoid holes)
+      if (!isHoleBehind(map, row, col)) {
+        return new Direction(MarioGame.LEFT);
       } else {
-        // ha nincs lyuk balra, menj balra
-        if (!isHoleBehind(map, row, col)) {
-          return new Direction(MarioGame.LEFT);
-        } else {
-          // ha lyuk van balra, ne menj oda
-          escapeLeft = false;
-        }
+        // If there's a hole behind, abort left escape
+        escapeLeft = false;
       }
     }
 
     // --- 3️⃣ Lyuk előtte? ---
     if (isHoleAhead(map, row, col)) {
+      // If Mario is right before a hole, jump instead of walking forward
       return jumpIfPossible();
     }
 
@@ -87,13 +87,41 @@ public class Agent extends MarioPlayer {
       return up;
     }
 
-    // --- 7️⃣ Alap mozgás (jobbra) ---
-    Direction right = new Direction(MarioGame.RIGHT);
-    state.apply(right);
-    return right;
+    // --- 7️⃣ Normal movement (avoid walking into holes) ---
+    if (!isHoleAhead(map, row, col)) {
+      Direction right = new Direction(MarioGame.RIGHT);
+      state.apply(right);
+      return right;
+    } else {
+      // If there’s a hole, jump to clear it
+      return new Direction(MarioGame.UP);
+    }
   }
 
-  // --- Segédfüggvények ---
+  // --- Utility Methods ---
+
+  private void updatePositionHistory(Mario mario) {
+    // Track Mario's horizontal position
+    lastPositions.add(mario.j);
+    if (lastPositions.size() > STUCK_HISTORY) {
+      lastPositions.poll();
+    }
+
+    // Detect completely identical positions (like pressed against a wall)
+    if (Math.abs(mario.j - lastX) < 0.05) {
+      samePosCounter++;
+    } else {
+      samePosCounter = 0;
+    }
+    lastX = mario.j;
+
+    // Emergency trigger: if stuck 8 frames in exactly same position
+    if (samePosCounter > 8) {
+      escapeLeft = true;
+      jumpPhase = true;
+      samePosCounter = 0;
+    }
+  }
 
   private boolean isHoleAhead(int[][] map, int row, int col) {
     for (int d = 1; d <= HOLE_LOOKAHEAD; d++) {
