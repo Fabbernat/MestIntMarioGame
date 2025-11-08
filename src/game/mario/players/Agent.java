@@ -36,6 +36,7 @@ public class Agent extends MarioPlayer {
 
   @Override
   public Direction getDirection(long remainingTime) {
+    System.out.println("Running Agent getDirection");
     Mario mario = state.mario;
     int[][] map = state.map;
     int row = (int) mario.i;
