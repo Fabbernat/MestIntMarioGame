@@ -1,5 +1,6 @@
 import game.mario.Direction;
 import game.mario.MarioGame;
+import game.mario.MarioPlayer;
 import game.mario.utils.Mario;
 import game.mario.utils.MarioState;
 import utils.State;
@@ -8,16 +9,13 @@ import java.util.Random;
 
 
 
-public class Agent implements IAgent {
-  private final int[][] map;
+public class Agent extends MarioPlayer {
+  private int[][] map;
   Mario mario;
+  Random random = new Random();
 
-  public Agent(int[][] map) {
-    this.map = map;
-    this.mario = new Mario(6, 10);
-  }
-
-  public Agent() {
+  public Agent(int color, Random random, State marioState) {
+    super(color, random, marioState);
     this.map = new int[13][100];
     this.mario = new Mario(6, 10);
   }
@@ -26,7 +24,6 @@ public class Agent implements IAgent {
     System.out.println("Hello World");
 
 
-    Random random = new Random();
     Direction action = new Direction(MarioGame.DIRECTIONS[random.nextInt(MarioGame.DIRECTIONS.length)]);
 
     State state = new State(map, mario);
