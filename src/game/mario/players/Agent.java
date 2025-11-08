@@ -24,12 +24,11 @@ public class Agent extends MarioPlayer {
   private boolean jumpPhase = false;
   private double lastX = -1;
   private int samePosCounter = 0;
-  private int escapeTicks = 0;
+  private int escapeTicks = 0; // controls duration of "escape mode"
 
-  // 👇 New random-left-move logic
+  // New fields for the left movement mechanic
   private int moveCounter = 0;
   private int leftMovesRemaining = 0;
-  private final Random rng = new Random();
 
   public Agent(int color, Random random, MarioState marioState) {
     super(color, random, marioState);
@@ -44,29 +43,25 @@ public class Agent extends MarioPlayer {
 
     updatePositionHistory(mario);
 
-    // --- 🔁 Count and trigger random left moves every 10th move ---
-    moveCounter++;
-    if (moveCounter % 10 == 0 && leftMovesRemaining == 0) {
-      // 50% chance to start left movement phase
-      if (rng.nextBoolean()) {
-        leftMovesRemaining = 4;
-      }
-    }
-
-    // --- 🌀 Handle the forced random-left sequence ---
+    // --- NEW: Handle forced left movements after every 10th move ---
     if (leftMovesRemaining > 0) {
       leftMovesRemaining--;
-      if (!isHoleBehind(map, row, col)) {
-        return new Direction(MarioGame.LEFT);
-      }
-      // If hole behind, skip left move to avoid suicide
+      return new Direction(MarioGame.LEFT);
+    }
+
+    // Increment move counter and check if we should trigger left movements
+    moveCounter++;
+    if (moveCounter >= 10) {
+      moveCounter = 0;
+      leftMovesRemaining = 4;
+      return new Direction(MarioGame.LEFT);
     }
 
     // --- 1️⃣ Stuck detection ---
     if (isStuck()) {
       escapeLeft = true;
       jumpPhase = true;
-      escapeTicks = 12;
+      escapeTicks = 12; // stay in escape mode for a few frames
       lastPositions.clear();
     }
 
@@ -76,24 +71,29 @@ public class Agent extends MarioPlayer {
         jumpPhase = false;
         return new Direction(MarioGame.UP);
       }
+
+      // Try to move left if possible
       if (!isHoleBehind(map, row, col)) {
         escapeTicks--;
         if (escapeTicks <= 0) escapeLeft = false;
         return new Direction(MarioGame.LEFT);
       } else {
+        // If hole behind, stop escaping
         escapeLeft = false;
       }
     }
 
-    // --- 3️⃣ Hole detection ---
+    // --- 3️⃣ Check for holes ---
     if (isHoleAhead(map, row, col)) {
+      // If hole is very close and ground below is missing → jump
       if (!hasGroundBelow(map, row, col + 1)) {
         return new Direction(MarioGame.UP);
       }
+      // If still on solid ground, stop or jump cautiously
       return new Direction(MarioGame.UP);
     }
 
-    // --- 4️⃣ Obstacle detection ---
+    // --- 4️⃣ Check for obstacles ---
     if (isObstacleAhead(map, row, col)) {
       return new Direction(MarioGame.UP);
     }
@@ -105,20 +105,21 @@ public class Agent extends MarioPlayer {
       return coinDir;
     }
 
-    // --- 6️⃣ Surprise blocks ---
+    // --- 6️⃣ Surprise blocks above ---
     if (isSurpriseAbove(map, row, col)) {
       Direction up = new Direction(MarioGame.UP);
       state.apply(up);
       return up;
     }
 
-    // --- 7️⃣ Normal movement ---
+    // --- 7️⃣ Regular movement ---
     if (!isHoleAhead(map, row, col)) {
       if (hasGroundBelow(map, row, col)) {
         Direction right = new Direction(MarioGame.RIGHT);
         state.apply(right);
         return right;
       } else {
+        // avoid walking mid-air
         return new Direction(MarioGame.UP);
       }
     } else {
@@ -134,6 +135,7 @@ public class Agent extends MarioPlayer {
       lastPositions.poll();
     }
 
+    // Detect staying in the same position
     if (Math.abs(mario.j - lastX) < 0.05) {
       samePosCounter++;
     } else {
@@ -209,6 +211,7 @@ public class Agent extends MarioPlayer {
 
   private boolean isStuck() {
     if (lastPositions.size() < STUCK_HISTORY) return false;
+
     double min = Double.MAX_VALUE;
     double max = Double.MIN_VALUE;
     for (double x : lastPositions) {
