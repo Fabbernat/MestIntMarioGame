@@ -4,9 +4,10 @@ import game.mario.MarioPlayer;
 import game.mario.utils.Mario;
 import game.mario.utils.MarioState;
 
-import java.util.Random;
+import java.util.*;
 
 public class Agent extends MarioPlayer {
+  ArrayList<Integer> lyukak = new ArrayList<>();
 
   public Agent(int color, Random random, MarioState marioState) {
     super(color, random, marioState);
@@ -14,97 +15,96 @@ public class Agent extends MarioPlayer {
 
   @Override
   public Direction getDirection(long remainingTime) {
-    Mario mario = state.mario; // aktuális Mario állapot
-    int[][] map = state.map; // 13x100-as pálya
-    int marioRow = (int) mario.i;
-    int marioCol = (int) mario.j;
 
-    // Elsődleges cél: jobbra haladás, kerülve a lyukakat
-    if (isHoleAhead(map, marioRow, marioCol)) {
-      // ha lyuk van előtte, ugorjunk
-      return jumpIfPossible();
-    }
+    double rowD = state.mario.i;
+    double colD = state.mario.j;
 
-    // Másodlagos cél: ha érme van jobbra, menj felé
-    Direction coinDir = moveTowardCoin(map, marioRow, marioCol);
-    if (coinDir != null) {
-      state.apply(coinDir);
-      return coinDir;
-    }
+    // -- sor és oszlop változókba elmentve
+    int row = (int) Math.round(rowD);
+    int col = (int) Math.round(colD);
 
-    // Ha meglepetésdoboz van felette, próbáljuk meg kiütni
-    if (isSurpriseAbove(map, marioRow, marioCol)) {
-      Direction up = new Direction(MarioGame.UP);
-      state.apply(up);
-      return up;
-    }
+    // --- Környezeti blokkok változókba elmentve---
+    //leftek
+    int left = getSafeBlock(row, col - 1);
+    int leftBelow = getSafeBlock(row - 1, col - 1);
+    int leftAbove =  getSafeBlock(row + 1, col - 1);
+    //rightok
+    int right = getSafeBlock(row, col + 1);
+    int rightBelow = getSafeBlock(row - 1, col + 1);
+    int rightAbove = getSafeBlock(row + 1, col + 1);
+    //le
+    int below = getSafeBlock(row - 1, col);
+    //fel
+    int above = getSafeBlock(row + 1, col);
+    //tavolabbiak
+    int farLeft = getSafeBlock(row, col - 2);
+    int farRight = getSafeBlock(row, col + 2);
+    int farBelow = getSafeBlock(row - 2, col);
+    int farAbove = getSafeBlock(row + 2, col);
 
-    // Alap viselkedés: menj jobbra
-    Direction right = new Direction(MarioGame.RIGHT);
-    state.apply(right);
-    return right;
-  }
+    //amiket nehezebb elnevezni
+    int EggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 1, col + 2);
+    int KettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 2, col + 2);
+    int KettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
 
-  /**
-   * Megnézi, hogy van-e lyuk Mario előtt 1-2 cellányira.
-   */
-  private boolean isHoleAhead(int[][] map, int row, int col) {
-    // Pálya határok védelme
-    if (col + 1 >= map[0].length) return false;
+    int[] veszelyesPoziciok = new int[]{
+            rightBelow, below, EggyelLejjebbEsKettovelJobbrabb, KettovelLejjebbEsKettovelJobbrabb, KettovelLejjebbEsEggyelJobbrabb, farBelow
+    };
+    // =======================
+    // 1) Lyuk
+    // =======================
+    for (int aktVeszPoz : veszelyesPoziciok) {
+      if (aktVeszPoz == MarioGame.EMPTY) {
+        Direction jump = new Direction(MarioGame.UP);
+        lyukak.add(aktVeszPoz);
+        if (state.isInAir){
 
-    for (int lookahead = 1; lookahead <= 2; lookahead++) {
-      int checkCol = col + lookahead;
-      // az alsó sorban üres hely lyuknak számít
-      if (checkCol < map[0].length && map[map.length - 1][checkCol] == MarioGame.EMPTY) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Ha érmét lát a közelben, kiválasztja az irányt, amerre érdemes menni.
-   */
-  private Direction moveTowardCoin(int[][] map, int row, int col) {
-    int searchRadius = 4; // néhány cellát előre nézünk
-
-    for (int dx = 1; dx <= searchRadius && col + dx < map[0].length; dx++) {
-      for (int dy = -2; dy <= 2; dy++) {
-        int targetRow = row + dy;
-        if (targetRow >= 0 && targetRow < map.length) {
-          if (map[targetRow][col + dx] == MarioGame.COIN) {
-            if (dy < 0) {
-              // érme fent -> ugrás
-              return new Direction(MarioGame.UP);
-            } else {
-              // érme vízszintesen -> jobbra mozgás
-              return new Direction(MarioGame.RIGHT);
-            }
-          }
         }
+        state.apply(jump);
+        return jump;
       }
     }
-    return null;
-  }
 
-  /**
-   * Megnézi, hogy van-e meglepetésdoboz Mario felett.
-   */
-  private boolean isSurpriseAbove(int[][] map, int row, int col) {
-    if (row - 1 >= 0 && map[row - 1][col] == MarioGame.SURPRISE) {
-      return true;
+    // =======================
+    // 2) Fal / Pipe
+    // =======================
+    if (right == MarioGame.WALL || right == MarioGame.PIPE) {
+      Direction jump = new Direction(MarioGame.UP);
+      state.apply(jump);
+      return jump;
     }
-    if (row - 2 >= 0 && map[row - 2][col] == MarioGame.SURPRISE) {
-      return true;
+
+    // =======================
+    // 11) Alap mozgás véletlen alapján: általában fel, néha jobbra és csak ritkán balra
+    // =======================
+
+    // --- nyomi változóim ---
+    int leftetEldontoBound = 5;
+    int konkretLeftHatar = 1;
+
+    int threshold = new Random().nextInt(leftetEldontoBound);
+    if (threshold < konkretLeftHatar) {
+      Direction goLeft =  new Direction(MarioGame.LEFT);
+      state.apply(goLeft);
+      return goLeft;
+    } else {
+      int felVagyJobbra = random.nextInt(3);
+      if (felVagyJobbra < 2) {
+        Direction jump = new Direction(MarioGame.UP);
+        state.apply(jump);
+        return jump;
+      } else {
+        Direction goRight = new Direction(MarioGame.RIGHT);
+        state.apply(goRight);
+        return goRight;
+      }
     }
-    return false;
   }
 
-  /**
-   * Megpróbál ugrani (pl. ha lyuk van előtte vagy akadály felette).
-   */
-  private Direction jumpIfPossible() {
-    return new Direction(MarioGame.UP);
+  private int getSafeBlock(int row, int col) {
+    if (row < 0 || col < 0) return MarioGame.EMPTY;
+    if (row >= state.map.length) return MarioGame.EMPTY;
+    if (col >= state.map[row].length) return MarioGame.EMPTY;
+    return state.map[row][col];
   }
-
 }
