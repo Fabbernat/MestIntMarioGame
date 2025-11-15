@@ -7,7 +7,13 @@ import game.mario.utils.MarioState;
 import java.util.*;
 
 public class Agent extends MarioPlayer {
+  Direction jump = new Direction(MarioGame.UP);
+  Direction goLeft = new Direction(MarioGame.LEFT);
+  Direction goRight = new Direction(MarioGame.RIGHT);
+  Direction dir;
+
   ArrayList<Integer> lyukak = new ArrayList<>();
+  private boolean valtottUgrasJobbra = false;
 
   public Agent(int color, Random random, MarioState marioState) {
     super(color, random, marioState);
@@ -15,7 +21,6 @@ public class Agent extends MarioPlayer {
 
   @Override
   public Direction getDirection(long remainingTime) {
-
     double rowD = state.mario.i;
     double colD = state.mario.j;
 
@@ -27,7 +32,7 @@ public class Agent extends MarioPlayer {
     //leftek
     int left = getSafeBlock(row, col - 1);
     int leftBelow = getSafeBlock(row - 1, col - 1);
-    int leftAbove =  getSafeBlock(row + 1, col - 1);
+    int leftAbove = getSafeBlock(row + 1, col - 1);
     //rightok
     int right = getSafeBlock(row, col + 1);
     int rightBelow = getSafeBlock(row - 1, col + 1);
@@ -43,63 +48,122 @@ public class Agent extends MarioPlayer {
     int farAbove = getSafeBlock(row + 2, col);
 
     //amiket nehezebb elnevezni
-    int EggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 1, col + 2);
-    int KettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 2, col + 2);
-    int KettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
+    int eggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 1, col + 2);
+    int kettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 2, col + 2);
+    int kettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
 
     int[] veszelyesPoziciok = new int[]{
-            rightBelow, below, EggyelLejjebbEsKettovelJobbrabb, KettovelLejjebbEsKettovelJobbrabb, KettovelLejjebbEsEggyelJobbrabb, farBelow
+            rightBelow, below, eggyelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsEggyelJobbrabb, farBelow
     };
     // =======================
-    // 1) Lyuk
+    // 1/A) Lyuk hozzáadása
     // =======================
+    lyukak.clear();
     for (int aktVeszPoz : veszelyesPoziciok) {
       if (aktVeszPoz == MarioGame.EMPTY) {
-        Direction jump = new Direction(MarioGame.UP);
-        lyukak.add(aktVeszPoz);
-        if (state.isInAir){
-
-        }
-        state.apply(jump);
-        return jump;
+        lyukak.add(1);  // csak egy flag-szerű érték, hogy van lyuk
       }
     }
 
     // =======================
-    // 2) Fal / Pipe
+    // 1/B – Lyuk törlése
+    // =======================
+    // Nem kell semmit törölni egyenként, mert fent clear-eltük.
+
+
+    /**
+     * Ha van lyuk a lyukakban, azaz van veszelyesPozicio a közelben, akkor
+     * Ha a below lyuk, akkor
+     * - ha a rightBelow is lyuk, akkor balra megyünk
+     * - ha a rightBelow nem lyuk, akkor jobbra megyünk.
+     *
+     * Ha a farBelow lyuk, akkor minden esetben jobbra tartunk. Ez azért lehetséges, mert a játékban garantált, hogy csak legfeljebb 2 nagyságú lyukak lesznek, és a lyuk végén nem lesz fal.
+     *
+     * - Ha a rightBelow, vagy a kettovelLejjebbEsEggyelJobbrabb nem lyuk, akkor jobbra megyünk.  (legyen egy // Ha a rightBelow, vagy a kettovelLejjebbEsEggyelJobbrabb nem lyuk, akkor jobbra megyünk. komment ott!).
+     *
+     * - Minden egyéb esetben felváltva UP és RIGHT műveleteket adunk ki ( jobbrafelé ugrunk).
+     */
+
+    // =======================
+    // LYUK LOGIKA A KOMMENT ALAPJÁN
+    // =======================
+    // Ha van bármilyen lyuk (veszélyesPozíció) a listában:
+    if (!lyukak.isEmpty()) {
+
+      // Ha a below lyuk
+      if (below == MarioGame.EMPTY && isLowest(below)) {
+
+        // - ha a rightBelow is lyuk → menjünk BALRA
+        if (rightBelow == MarioGame.EMPTY && isLowest(rightBelow)) {
+          return goLeft;
+        }
+
+        // - ha a rightBelow nem lyuk → doABaseMovement
+        else {
+          dir = doABaseMovement();
+          return dir;
+        }
+      }
+
+      // Ha a farBelow lyuk → doABaseMovement
+      if (farBelow == MarioGame.EMPTY) {
+        dir = doABaseMovement();
+        return dir;
+      }
+
+      // Ha a rightBelow vagy a kettovelLejjebbEsEggyelJobbrabb nem lyuk → jobbra
+      if (rightBelow != MarioGame.EMPTY || kettovelLejjebbEsEggyelJobbrabb != MarioGame.EMPTY) {
+        return goRight;
+      }
+
+      // Minden egyéb helyzetben felváltva UP és RIGHT (jobbrafelé ugrás)
+      // Ezt úgy oldjuk meg, hogy minden második hívásnál mást csinál:
+      if (random.nextBoolean()) {
+        return jump;
+      } else {
+        return goRight;
+      }
+    }
+
+
+    // =======================
+    // Fal / Pipe
     // =======================
     if (right == MarioGame.WALL || right == MarioGame.PIPE) {
-      Direction jump = new Direction(MarioGame.UP);
-      state.apply(jump);
       return jump;
     }
 
     // =======================
-    // 11) Alap mozgás véletlen alapján: általában fel, néha jobbra és csak ritkán balra
+    // Alap mozgás véletlen alapján: általában fel, néha jobbra és csak ritkán balra
     // =======================
 
+    return doABaseMovement();
+  }
+
+  private Direction doABaseMovement() {
     // --- nyomi változóim ---
     int leftetEldontoBound = 5;
     int konkretLeftHatar = 1;
 
-    int threshold = new Random().nextInt(leftetEldontoBound);
+    int threshold = random.nextInt(leftetEldontoBound);
     if (threshold < konkretLeftHatar) {
-      Direction goLeft =  new Direction(MarioGame.LEFT);
-      state.apply(goLeft);
       return goLeft;
     } else {
       int felVagyJobbra = random.nextInt(3);
       if (felVagyJobbra < 2) {
-        Direction jump = new Direction(MarioGame.UP);
-        state.apply(jump);
         return jump;
       } else {
-        Direction goRight = new Direction(MarioGame.RIGHT);
-        state.apply(goRight);
         return goRight;
       }
     }
   }
+
+  boolean isLowest(int i) {
+    return i == MarioGame.H - 1;
+  }
+
+  ;
+
 
   private int getSafeBlock(int row, int col) {
     if (row < 0 || col < 0) return MarioGame.EMPTY;
