@@ -117,10 +117,13 @@ public class Agent extends MarioPlayer {
       }
 
       // Minden egyéb helyzetben felváltva UP és RIGHT (jobbrafelé ugrás)
-      // Ezt úgy oldjuk meg, hogy minden második hívásnál mást csinál:
-      if (random.nextBoolean()) {
+      if (!valtottUgrasJobbra) {
+        valtottUgrasJobbra = true;
+        state.apply(jump);
         return jump;
       } else {
+        valtottUgrasJobbra = false;
+        state.apply(goRight);
         return goRight;
       }
     }
