@@ -1,147 +1,110 @@
-import java.util.Random;
 import game.mario.Direction;
 import game.mario.MarioGame;
 import game.mario.MarioPlayer;
+import game.mario.utils.Mario;
 import game.mario.utils.MarioState;
+
+import java.util.Random;
 
 public class Agent extends MarioPlayer {
 
-  private boolean akadalyMiattUgras = false;
-  private int lepesekJobbraAkadalyMiatt = 0;
-  private boolean falMiattUgras = false;
-  private boolean lepkedes = false;  //ha jobbra ment true, ha allt false
-  private int ajandek = 0; //ha ajándékot talál akkor elkezd gondókodni hogy van-e felette is, meg megáll miután ugrott, az ajandek novelese a fazisoktol fugg
-
-  public Agent(int color, Random random, MarioState state){
-    super(color, random, state);
-    System.out.println("Agent constructor called");
+  public Agent(int color, Random random, MarioState marioState) {
+    super(color, random, marioState);
   }
-
-
 
   @Override
   public Direction getDirection(long remainingTime) {
-    int[][] map = state.map;
-    int height = map.length;
-    int width = map[0].length;
+    Mario mario = state.mario; // aktuális Mario állapot
+    int[][] map = state.map; // 13x100-as pálya
+    int marioRow = (int) mario.i;
+    int marioCol = (int) mario.j;
 
+    // Elsődleges cél: jobbra haladás, kerülve a lyukakat
+    if (isHoleAhead(map, marioRow, marioCol)) {
+      // ha lyuk van előtte, ugorjunk
+      return jumpIfPossible();
+    }
 
-    //Mario kibaszott pozíciójának változói
-    int marioX = -1, marioY = -1;
+    // Másodlagos cél: ha érme van jobbra, menj felé
+    Direction coinDir = moveTowardCoin(map, marioRow, marioCol);
+    if (coinDir != null) {
+      state.apply(coinDir);
+      return coinDir;
+    }
 
-    //Megkeressük a báttyát
-    for(int y = 0; y < 13; y++){
-      for(int x = 0; x < 100; x++){
-        if(map[y][x] == MarioGame.MARIO){
-          marioX = x;
-          marioY = y;
-          break;
+    // Ha meglepetésdoboz van felette, próbáljuk meg kiütni
+    if (isSurpriseAbove(map, marioRow, marioCol)) {
+      Direction up = new Direction(MarioGame.UP);
+      state.apply(up);
+      return up;
+    }
+
+    // Alap viselkedés: menj jobbra
+    Direction right = new Direction(MarioGame.RIGHT);
+    state.apply(right);
+    return right;
+  }
+
+  /**
+   * Megnézi, hogy van-e lyuk Mario előtt 1-2 cellányira.
+   */
+  private boolean isHoleAhead(int[][] map, int row, int col) {
+    // Pálya határok védelme
+    if (col + 1 >= map[0].length) return false;
+
+    for (int lookahead = 1; lookahead <= 2; lookahead++) {
+      int checkCol = col + lookahead;
+      // az alsó sorban üres hely lyuknak számít
+      if (checkCol < map[0].length && map[map.length - 1][checkCol] == MarioGame.EMPTY) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Ha érmét lát a közelben, kiválasztja az irányt, amerre érdemes menni.
+   */
+  private Direction moveTowardCoin(int[][] map, int row, int col) {
+    int searchRadius = 4; // néhány cellát előre nézünk
+
+    for (int dx = 1; dx <= searchRadius && col + dx < map[0].length; dx++) {
+      for (int dy = -2; dy <= 2; dy++) {
+        int targetRow = row + dy;
+        if (targetRow >= 0 && targetRow < map.length) {
+          if (map[targetRow][col + dx] == MarioGame.COIN) {
+            if (dy < 0) {
+              // érme fent -> ugrás
+              return new Direction(MarioGame.UP);
+            } else {
+              // érme vízszintesen -> jobbra mozgás
+              return new Direction(MarioGame.RIGHT);
+            }
+          }
         }
       }
-      if(marioX != -1) break;
     }
-    //---------------------------------------------
+    return null;
+  }
 
+  /**
+   * Megnézi, hogy van-e meglepetésdoboz Mario felett.
+   */
+  private boolean isSurpriseAbove(int[][] map, int row, int col) {
+    if (row - 1 >= 0 && map[row - 1][col] == MarioGame.SURPRISE) {
+      return true;
+    }
+    if (row - 2 >= 0 && map[row - 2][col] == MarioGame.SURPRISE) {
+      return true;
+    }
+    return false;
+  }
 
-    //----------------------------------------------------------------------
-    //Ha fal miatt ugrottunk akkor rajta maradunk a fal tetején
-    if(falMiattUgras){
-      falMiattUgras = false;
-      lepkedes = true;
-      Direction action = new Direction(MarioGame.RIGHT);
-      state.apply(action);
-      return action;
-    }
-    //Akadály (Pipe)
-    if(marioX + 1 < width && map[marioY][marioX + 1] == MarioGame.PIPE){
-      //akadalyMiattUgras = true;
-      Direction action = new Direction(MarioGame.UP);
-      state.apply(action);
-      return action;
-    }
-    //----------------------------------------------------------------------
-    //Akadály (Lyuk)
-    if(marioY > 10){
-      if (marioY + 1 < height && marioX + 1 < width &&
-              map[marioY + 1][marioX + 1] == MarioGame.EMPTY &&
-              map[marioY][marioX + 1] == MarioGame.EMPTY) {
-        //akadalyMiattUgras = true;
-        Direction action = new Direction(MarioGame.UP);
-        state.apply(action);
-        return action;
-      }
-    }
-    //----------------------------------------------------------------------
-    //Fal előtte
-    if(marioX + 1 < width && map[marioY][marioX + 1] == MarioGame.WALL){
-      falMiattUgras = true;
-      Direction action = new Direction(MarioGame.UP);
-      state.apply(action);
-      return action;
-    }
-    //-----------------------------------------------------------------------
-    //Ha van ajándék, vagy fal 4 blokkal felette akkor felugrik rá és kiüti a másikat
-    if(ajandek == 1){
-      ajandek = 2;
-      Direction action = new Direction(MarioGame.RIGHT);
-      state.apply(action);
-      return action;
-    }
-    if(ajandek >= 8 && ajandek < 15){
-      ajandek += 1;
-      Direction action = new Direction(MarioGame.UP);
-      state.apply(action);
-      return action;
-    }
-    if(ajandek >= 15 && ajandek < 17){
-      ajandek += 1;
-      Direction action = new Direction(MarioGame.RIGHT);
-      state.apply(action);
-      return action;
-    }
-    if(ajandek == 17){
-      ajandek = 0;
-      Direction action = new Direction(MarioGame.UP);
-      state.apply(action);
-      return action;
-    }
-    if(ajandek < 8 && ajandek > 1){
-      ajandek += 1;
-      Direction action = new Direction(MarioGame.LEFT);
-      state.apply(action);
-      return action;
-    }
-    //-----------------------------------------------------------------------
-
-    //Ajándék egy másikkal felette
-    if(map[marioY - 3][marioX + 1] == MarioGame.SURPRISE && map[marioY - 7][marioX + 1] == MarioGame.SURPRISE){
-      Direction action = new Direction(MarioGame.UP);
-      ajandek = 1;
-      state.apply(action);
-      return action;
-    }
-    //-----------------------------------------------------------------------
-    //Ajándék magában
-    if(map[marioY - 3][marioX + 1] == MarioGame.SURPRISE){
-      Direction action = new Direction(MarioGame.UP);
-      state.apply(action);
-      return action;
-    }
-    //-----------------------------------------------------------------------
-
-    if(lepkedes){
-      lepkedes = false;
-      state.apply(null);
-      return null;
-    }
-
-    Direction action = new Direction(MarioGame.RIGHT);
-    lepkedes = true;
-    state.apply(action);
-    return action;
+  /**
+   * Megpróbál ugrani (pl. ha lyuk van előtte vagy akadály felette).
+   */
+  private Direction jumpIfPossible() {
+    return new Direction(MarioGame.UP);
   }
 
 }
-
-
-
