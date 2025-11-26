@@ -5,8 +5,7 @@ import game.mario.MarioGame;
 import game.mario.MarioPlayer;
 import game.mario.utils.MarioState;
 
-import static game.mario.MarioGame.PIPE;
-import static game.mario.MarioGame.WALL;
+import static game.mario.MarioGame.*;
 
 /**
  * Feljavított Mario Agent.
@@ -167,7 +166,7 @@ public class Agent extends MarioPlayer {
     //-----------------------------------------------------------//
     //----------------------------------------------------------------------
     //Akadály (Lyuk)
-    boolean holeAhead = rightBelow == MarioGame.EMPTY && below == MarioGame.EMPTY;
+    boolean holeAhead = rightBelow == EMPTY && below == EMPTY && farBelow == EMPTY;
 
     if (holeAhead) return jump;
 
@@ -175,7 +174,7 @@ public class Agent extends MarioPlayer {
     // 4. Fal előtte
     //-----------------------------------------------------------//
 
-    boolean onGround = below != MarioGame.EMPTY;
+    boolean onGround = below != EMPTY;
 
     if (onGround && map[marioY][marioX + 1] == WALL) {
       falMiattUgras = true;
