@@ -17,8 +17,8 @@ import static game.mario.MarioGame.*;
  * 4. Alapértelmezett mozgás: jobbra
  */
 public class Agent extends MarioPlayer {
-  int INF = Integer.MAX_VALUE;
-  int NINF = Integer.MIN_VALUE;
+  int INF = Integer.MAX_VALUE / 2;
+  int NINF = Integer.MIN_VALUE / 2;
 
   Direction jump = new Direction(MarioGame.UP);
   Direction goLeft = new Direction(MarioGame.LEFT);
@@ -51,7 +51,7 @@ public class Agent extends MarioPlayer {
 
   @Override
   public Direction getDirection(long remainingTime) {
-    if (balraMenetelek <= 5){
+    if (0 <= balraMenetelek && balraMenetelek <= 5){
       ++balraMenetelek;
       if (balraMenetelek == 6){
         balraMenetelek = INF;
@@ -119,10 +119,12 @@ public class Agent extends MarioPlayer {
     int furthestBelow = getSafeBlock(row + 3, col);
     int furthestAbove = getSafeBlock(row - 3, col);
 
-    //amiket nehezebb elnevezni
-    int eggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 1, col + 2);
-    int kettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 2, col + 2);
-    int kettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
+    // 2-1 és 2-2 delták
+    int eggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row + 1, col + 2);
+    int kettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row + 2, col + 2);
+    int kettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row + 2, col + 1);
+
+    int kettovelFeljebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
 
     int[] veszelyesPoziciok = new int[]{
             rightBelow, below, eggyelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsEggyelJobbrabb, farBelow
@@ -148,7 +150,9 @@ public class Agent extends MarioPlayer {
       balraMenetelek = 1;
 
       if (above == PIPE || above == WALL || farAbove == PIPE || farAbove == WALL || furthestAbove == PIPE || furthestAbove == WALL) {
+        if ((right == PIPE || right == WALL) && (rightAbove == PIPE || rightAbove == WALL) && (kettovelFeljebbEsEggyelJobbrabb == PIPE || kettovelFeljebbEsEggyelJobbrabb == WALL)) {
         return goLeft;
+          }
       } else return jump;
     }
 
