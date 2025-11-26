@@ -145,15 +145,15 @@ public class Agent extends MarioPlayer {
 
   private Direction doABaseMovement() {
     // --- nyomi változóim ---
-    int leftetEldontoBound = 5;
-    int konkretLeftHatar = 1;
+    int leftetEldontoBound = 11;
+    int konkretLeftHatar = 2;
 
     int threshold = random.nextInt(leftetEldontoBound);
     if (threshold < konkretLeftHatar) {
       return goLeft;
     } else {
-      int felVagyJobbra = random.nextInt(3);
-      if (felVagyJobbra < 2) {
+      int felVagyJobbra = random.nextInt(2);
+      if (felVagyJobbra < 1) {
         return jump;
       } else {
         return goRight;
