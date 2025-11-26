@@ -126,7 +126,7 @@ public class Agent extends MarioPlayer {
             rightBelow, below, eggyelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsEggyelJobbrabb, farBelow
     };
 
-    if (below != EMPTY) {
+    if (right == WALL || right == PIPE) {
       return jump;
     }
     // =======================
@@ -181,8 +181,8 @@ public class Agent extends MarioPlayer {
     //----------------------------------------------------------------------
     //Akadály (Lyuk)
     boolean holeAhead =
-            (rightBelow == EMPTY)      // közvetlenül előtte nincs talaj
-                    && (kettovelLejjebbEsEggyelJobbrabb == EMPTY);  // és kicsit távolabb sincs
+            getSafeBlock(row + 1, col + 1) == EMPTY &&
+                    getSafeBlock(row + 2, col + 1) == EMPTY;
 
 
     // Ugrjunk csak akkor, ha a talajon vagyunk — így elkerüljük a levegőben ismételt ugrást.
