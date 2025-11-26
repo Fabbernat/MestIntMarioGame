@@ -27,7 +27,7 @@ for /l %%x in (1, 1, %limit%) do (
     echo %%x.
     echo Seed: !seed!
 
-    for /f "delims=" %%A in ('java -jar game_engine.jar 99999 game.mario.MarioGame !seed! 1000 Agent') do (
+    for /f "delims=" %%A in ('java -jar game_engine.jar 60 game.mario.MarioGame !seed! 1000 Agent') do (
         set "output=%%A"
     )
 
