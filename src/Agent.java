@@ -1,309 +1,12 @@
-import java.util.ArrayList;
-import java.util.Random;
-
 import game.mario.Direction;
 import game.mario.MarioGame;
 import game.mario.MarioPlayer;
+import game.mario.utils.Mario;
 import game.mario.utils.MarioState;
 
-import static game.mario.MarioGame.*;
+import java.util.*;
 
-/**
- * Feljavított Mario Agent.
- * <p>
- * Prioritások:
- * 1. Fal, cső vagy lyuk → ugrás
- * 2. Különleges "ajándék fázis" → állapotgép alapú mozgás
- * 3. Ajándék doboz vizsgálata (magasan vagy egyedül) → ugrás
- * 4. Alapértelmezett mozgás: jobbra
- */
 public class Agent extends MarioPlayer {
-  int INF = Integer.MAX_VALUE / 2;
-  int NINF = Integer.MIN_VALUE / 2;
-
-  Direction jump = new Direction(MarioGame.UP);
-  Direction goLeft = new Direction(MarioGame.LEFT);
-  Direction goRight = new Direction(MarioGame.RIGHT);
-  Direction dir;
-  boolean menj5xBalra;
-  int balraMenetelek = INF;
-
-  ArrayList<Integer> lyukak = new ArrayList<>();
-
-
-  private boolean falMiattUgras = false;
-  private boolean lepkedes = false;
-
-  /**
-   * Ajándék fázis állapotgép:
-   * 0 = nincs folyamatban
-   * 1 = első ugrás után jobbra lépés
-   * 2–7 = visszalépések balra
-   * 8–14 = ugrások
-   * 15–16 = jobbra mozgás
-   * 17 = végső ugrás → reset
-   */
-  private int ajandek = 0;
-
-  public Agent(int color, Random random, MarioState state) {
-    super(color, random, state);
-  }
-
-
-  @Override
-  public Direction getDirection(long remainingTime) {
-    if (0 <= balraMenetelek && balraMenetelek <= 5) {
-      ++balraMenetelek;
-      if (balraMenetelek == 6) {
-        balraMenetelek = INF;
-      }
-      return goLeft;
-    }
-
-    int[][] map = state.map;
-    int height = map.length;
-    int width = map[0].length;
-
-    int marioX = -1, marioY = -1;
-
-    // Mario pozíció megkeresése
-    for (int y = 0; y < MarioGame.H; y++) {
-      for (int x = 0; x < MarioGame.W; x++) {
-        if (map[y][x] == MarioGame.MARIO) {
-          marioX = x;
-          marioY = y;
-          break;
-        }
-      }
-      if (marioX != -1) break;
-    }
-
-
-    double rowD = state.mario.i;
-    double colD = state.mario.j;
-
-    // -- sor és oszlop változókba elmentve
-    int row = (int) Math.round(rowD);
-    int col = (int) Math.round(colD);
-
-    // --- Környezeti blokkok változókba elmentve---
-    //leftek
-    int left = getSafeBlock(row, col - 1);
-    int leftBelow = getSafeBlock(row + 1, col - 1);
-    int leftAbove = getSafeBlock(row - 1, col - 1);
-
-    //rightok
-    int right = getSafeBlock(row, col + 1);
-    int rightBelow = getSafeBlock(row + 1, col + 1);
-    int rightAbove = getSafeBlock(row - 1, col + 1);
-
-    //le
-    int below = getSafeBlock(row + 1, col);
-
-    //fel
-    int above = getSafeBlock(row - 1, col);
-
-    // 2-re levok
-    int farLeft = getSafeBlock(row, col - 2);
-    int farRight = getSafeBlock(row, col + 2);
-    int farBelow = getSafeBlock(row + 2, col);
-    int farAbove = getSafeBlock(row - 2, col);
-
-    // 3-ra levok
-    int furthestLeft = getSafeBlock(row, col - 3);
-    int furthestRight = getSafeBlock(row, col + 3);
-    int furthestBelow = getSafeBlock(row + 3, col);
-    int furthestAbove = getSafeBlock(row - 3, col);
-
-    // 2-1 és 2-2 delták
-    int eggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row + 1, col + 2);
-    int kettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row + 2, col + 2);
-    int kettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row + 2, col + 1);
-
-    int kettovelFeljebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
-
-    int[] veszelyesPoziciok = new int[]{
-            rightBelow, below, eggyelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsEggyelJobbrabb, farBelow
-    };
-
-    if (right == WALL || right == PIPE) {
-      return jump;
-    }
-    // =======================
-    // 1/A) Lyuk hozzáadása
-    // =======================
-    lyukak.clear();
-    for (int aktVeszPoz : veszelyesPoziciok) {
-      if (aktVeszPoz == MarioGame.EMPTY) {
-        lyukak.add(1);  // csak egy flag-szerű érték, hogy van lyuk
-      }
-    }
-
-
-    //-----------------------------------------------------------//
-    // 1. Fal miatt ugrás – ha ugrással értünk a tetejére
-    //-----------------------------------------------------------//
-    boolean onGround = below != MarioGame.EMPTY;
-    if (falMiattUgras) {
-      falMiattUgras = false;
-      lepkedes = true;
-      balraMenetelek = 1;
-
-
-      // ha fent fal van és jobbra is fal, próbáljunk balra visszalépni — DE csak ha a baloldalon biztonságos a talaj
-      if (above != EMPTY || farAbove != EMPTY || furthestAbove != EMPTY) {
-        if ((right != EMPTY) && (rightAbove != EMPTY) && (kettovelFeljebbEsEggyelJobbrabb != EMPTY)) {
-          // csak menjünk balra ha bal alatt és bal maga nem lyuk
-          if (left != EMPTY && leftBelow != EMPTY) {
-            return goLeft;
-          } else {
-            // ha bal sem biztonságos, akkor inkább ugorjunk (megpróbálni kikerülni)
-            return jump;
-          }
-        }
-      } else {
-        // ha nem tetején kellünk, akkor ugorjunk — de csak ha a talajon állunk
-        if (onGround) return jump;
-        else return goRight;
-      }
-    }
-
-    //-----------------------------------------------------------//
-    // 2. Cső akadály
-    //-----------------------------------------------------------//
-    if (marioX + 1 < width && map[marioY][marioX + 1] == PIPE) {
-      return jump;
-    }
-
-    //-----------------------------------------------------------//
-    // 3. Lyuk detektálása (ha előtte nincs talaj)
-    //-----------------------------------------------------------//
-    //----------------------------------------------------------------------
-    //Akadály (Lyuk)
-    boolean holeAhead =
-            getSafeBlock(row + 1, col + 1) == EMPTY &&
-                    getSafeBlock(row + 2, col + 1) == EMPTY;
-
-
-    // Ugrjunk csak akkor, ha a talajon vagyunk — így elkerüljük a levegőben ismételt ugrást.
-    if (holeAhead && onGround) return jump;
-    //-----------------------------------------------------------//
-    // 4. Fal előtte
-    //-----------------------------------------------------------//
-
-
-    if (onGround && map[marioY][marioX + 1] == WALL) {
-      falMiattUgras = true;
-      return jump;
-    }
-
-    //-----------------------------------------------------------//
-    // 5. Ajándék fázis állapotgép – finomított logika
-    //-----------------------------------------------------------//
-    if (ajandek == 1) {
-      ajandek = 2;
-      return goRight;
-    }
-    if (ajandek >= 8 && ajandek < 15) {
-      ajandek++;
-      return jump;
-    }
-    if (ajandek >= 15 && ajandek < 17) {
-      ajandek++;
-      return goRight;
-    }
-    if (ajandek == 17) {
-      ajandek = 0;
-      return jump;
-    }
-    if (ajandek > 1 && ajandek < 8) {
-      ajandek++;
-      return goLeft;
-    }
-
-    //-----------------------------------------------------------//
-    // 6. Ajándék vizsgálata a Mario felett
-    //-----------------------------------------------------------//
-
-    // dupla ajándék egymás felett
-    if (marioY - 7 >= 0 && marioY - 3 >= 0 && marioX + 1 < width &&
-            map[marioY - 3][marioX + 1] == MarioGame.SURPRISE &&
-            map[marioY - 7][marioX + 1] == MarioGame.SURPRISE) {
-      ajandek = 1;
-      return jump;
-    }
-
-    // egyszerű, egy darab ajándék
-    if (marioY - 3 >= 0 && marioX + 1 < width &&
-            map[marioY - 3][marioX + 1] == MarioGame.SURPRISE) {
-      return jump;
-    }
-
-    //-----------------------------------------------------------//
-    // 7. Lepkedés kezelés (megállás jobbra lépés után)
-    //-----------------------------------------------------------//
-    if (lepkedes) {
-      lepkedes = false;
-      return new Direction(MarioGame.RIGHT); // vagy semmi extra
-    }
-
-    //-----------------------------------------------------------//
-    // 8. Alapértelmezett viselkedés – jobbra haladás
-    //-----------------------------------------------------------//
-
-    lepkedes = true;
-    return goRight;
-
-  }
-
-  private Direction doABaseMovement() {
-    // --- nyomi változóim ---
-    int leftetEldontoBound = 5;
-    int konkretLeftHatar = 1;
-
-    int threshold = random.nextInt(leftetEldontoBound);
-    if (threshold < konkretLeftHatar) {
-      return goLeft;
-    } else {
-      int felVagyJobbra = random.nextInt(2);
-      if (felVagyJobbra < 1) {
-        return jump;
-      } else {
-        return goRight;
-      }
-    }
-  }
-
-
-  private Direction doALeftOrRightMovement() {
-    int threshold = random.nextInt(2);
-    if (threshold < 1)
-      return goLeft;
-    else return goRight;
-  }
-
-
-  boolean isLowest(int i) {
-    return i == MarioGame.H - 1;
-  }
-
-
-  private int getSafeBlock(int row, int col) {
-    if (row >= H) {
-      row = H - 1;
-    }
-    if (col >= W) {
-      col = W - 1;
-    }
-//    if (row < 0 || col < 0) return MarioGame.EMPTY;
-//    if (row >= state.map.length) return MarioGame.EMPTY;
-//    if (col >= state.map[row].length) return MarioGame.EMPTY;
-    return state.map[row][col];
-  }
-}
-
-
-class Agent2 extends MarioPlayer {
   Direction jump = new Direction(MarioGame.UP);
   Direction goLeft = new Direction(MarioGame.LEFT);
   Direction goRight = new Direction(MarioGame.RIGHT);
@@ -311,8 +14,10 @@ class Agent2 extends MarioPlayer {
 
   ArrayList<Integer> lyukak = new ArrayList<>();
   private boolean valtottUgrasJobbra = false;
+  private boolean inHoleJump = false;
+  private int safeStepsRight = 0;
 
-  public Agent2(int color, Random random, MarioState marioState) {
+  public Agent(int color, Random random, MarioState marioState) {
     super(color, random, marioState);
   }
 
@@ -362,10 +67,30 @@ class Agent2 extends MarioPlayer {
       }
     }
 
-    // =======================
-    // 1/B – Lyuk törlése
-    // =======================
-    // Nem kell semmit törölni egyenként, mert fent clear-eltük.
+
+    // Ha folyamatban van a lyuk feletti ugrás, akkor tartsuk fent
+    if (inHoleJump) {
+
+      // Amíg alatta a legalsó szint EMPTY, addig folytasd az ugrást
+      int under = getSafeBlock(row - 1, col);
+      if (under == MarioGame.EMPTY && isLowest(under)) {
+        return jump;  // továbbra is felfelé
+      }
+
+      // Ha már nem a lyuk ovan -> kezdődhet a biztonságos jobbra lépkedés
+      if (safeStepsRight == 0) {
+        safeStepsRight = 3;  // ennyi lépés jobbra biztonságból
+      }
+    }
+
+// Ha épp biztonsági jobbra-lépést kell tenni
+    if (safeStepsRight > 0) {
+      safeStepsRight--;
+      if (safeStepsRight == 0) {
+        inHoleJump = false; // vége a lyuk-szekvenciának
+      }
+      return goRight;
+    }
 
 
     /**
@@ -382,7 +107,7 @@ class Agent2 extends MarioPlayer {
      */
 
     // =======================
-    // LYUK LOGIKA A KOMMENT ALAPJÁN
+    // LYUK LOGIKA
     // =======================
     // Ha van bármilyen lyuk (veszélyesPozíció) a listában:
     if (!lyukak.isEmpty()) {
@@ -413,20 +138,27 @@ class Agent2 extends MarioPlayer {
         return goRight;
       }
 
+      // Itt indul az "ugrunk egy lyuk felett" állapot
+      inHoleJump = true;
+
       // Minden egyéb helyzetben felváltva UP és RIGHT (jobbrafelé ugrás)
-      // Ezt úgy oldjuk meg, hogy minden második hívásnál mást csinál:
-      if (random.nextBoolean()) {
+      if (!valtottUgrasJobbra) {
+        valtottUgrasJobbra = true;
+        state.apply(jump);
         return jump;
       } else {
+        valtottUgrasJobbra = false;
+        state.apply(goRight);
         return goRight;
       }
+
     }
 
 
     // =======================
     // Fal / Pipe
     // =======================
-    if (right == MarioGame.WALL || right == PIPE) {
+    if (right == MarioGame.WALL || right == MarioGame.PIPE) {
       return jump;
     }
 
@@ -439,15 +171,15 @@ class Agent2 extends MarioPlayer {
 
   private Direction doABaseMovement() {
     // --- nyomi változóim ---
-    int leftetEldontoBound = 5;
-    int konkretLeftHatar = 1;
+    int leftetEldontoBound = 11;
+    int konkretLeftHatar = 2;
 
     int threshold = random.nextInt(leftetEldontoBound);
     if (threshold < konkretLeftHatar) {
       return goLeft;
     } else {
       int felVagyJobbra = random.nextInt(3);
-      if (felVagyJobbra < 2) {
+      if (felVagyJobbra < 1) {
         return jump;
       } else {
         return goRight;
@@ -458,6 +190,8 @@ class Agent2 extends MarioPlayer {
   boolean isLowest(int i) {
     return i == MarioGame.H - 1;
   }
+
+  ;
 
 
   private int getSafeBlock(int row, int col) {
