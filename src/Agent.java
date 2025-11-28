@@ -1,21 +1,71 @@
 import game.mario.Direction;
 import game.mario.MarioGame;
 import game.mario.MarioPlayer;
-import game.mario.utils.Mario;
 import game.mario.utils.MarioState;
 
 import java.util.*;
 
+import static game.mario.MarioGame.H;
+
+/**
+ * Feljavított Mario Agent.
+ * <p>
+ * Prioritások:
+ * 1. Fal, cső vagy lyuk → ugrás
+ * 2. Különleges "ajándék fázis" → állapotgép alapú mozgás
+ * 3. Ajándék doboz vizsgálata (magasan vagy egyedül) → ugrás
+ * 4. Alapértelmezett mozgás: jobbra
+ */
 public class Agent extends MarioPlayer {
+  int INF = Integer.MAX_VALUE / 2;
+  int NINF = Integer.MIN_VALUE / 2;
+
+
   Direction jump = new Direction(MarioGame.UP);
   Direction goLeft = new Direction(MarioGame.LEFT);
   Direction goRight = new Direction(MarioGame.RIGHT);
   Direction dir;
 
+
+  double dx; // oldalra speed
+  double dy; // felfele speed
+
   ArrayList<Integer> lyukak = new ArrayList<>();
+
+  enum Status {
+    JUMPING(0),
+    STATIC(1),
+    FALLING(2),
+    LEFT_UP(3),
+    LEFT(4),
+    LEFT_DOWN(5),
+    RIGHT_UP(6),
+    RIGHT(7),
+    RIGHT_DOWN(8);
+
+    public final int code;
+
+    Status(int code) {
+      this.code = code;
+    }
+  }
+
+  Status status;
   private boolean valtottUgrasJobbra = false;
   private boolean inHoleJump = false;
   private int safeStepsRight = 0;
+
+
+  /**
+   * Ajándék fázis állapotgép:
+   * 0 = nincs folyamatban
+   * 1 = első ugrás után jobbra lépés
+   * 2–7 = visszalépések balra
+   * 8–14 = ugrások
+   * 15–16 = jobbra mozgás
+   * 17 = végső ugrás → reset
+   */
+  private int ajandek = 0;
 
   public Agent(int color, Random random, MarioState marioState) {
     super(color, random, marioState);
@@ -23,6 +73,12 @@ public class Agent extends MarioPlayer {
 
   @Override
   public Direction getDirection(long remainingTime) {
+
+    int[][] map = state.map;
+    int height = map.length;
+    int width = map[0].length;
+
+
     double rowD = state.mario.i;
     double colD = state.mario.j;
 
@@ -35,27 +91,44 @@ public class Agent extends MarioPlayer {
     int left = getSafeBlock(row, col - 1);
     int leftBelow = getSafeBlock(row - 1, col - 1);
     int leftAbove = getSafeBlock(row + 1, col - 1);
+
     //rightok
     int right = getSafeBlock(row, col + 1);
     int rightBelow = getSafeBlock(row - 1, col + 1);
     int rightAbove = getSafeBlock(row + 1, col + 1);
+
     //le
     int below = getSafeBlock(row - 1, col);
+
     //fel
     int above = getSafeBlock(row + 1, col);
-    //tavolabbiak
+
+    // 2-re levok
     int farLeft = getSafeBlock(row, col - 2);
     int farRight = getSafeBlock(row, col + 2);
-    int farBelow = getSafeBlock(row - 2, col);
-    int farAbove = getSafeBlock(row + 2, col);
+    int farBelow = getSafeBlock(row + 2, col);
+    int farAbove = getSafeBlock(row - 2, col);
 
-    //amiket nehezebb elnevezni
-    int eggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 1, col + 2);
-    int kettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row - 2, col + 2);
-    int kettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
+    // 3-ra levok
+    int furthestLeft = getSafeBlock(row, col - 3);
+    int furthestRight = getSafeBlock(row, col + 3);
+    int furthestBelow = getSafeBlock(row + 3, col);
+    int furthestAbove = getSafeBlock(row - 3, col);
+
+    // 2-1 és 2-2 delták
+    int eggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row + 1, col + 2);
+    int kettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row + 2, col + 2);
+    int kettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row + 2, col + 1);
+
+    int kettovelFeljebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
 
     int[] veszelyesPoziciok = new int[]{
-            rightBelow, below, eggyelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsKettovelJobbrabb, kettovelLejjebbEsEggyelJobbrabb, farBelow
+            rightBelow,
+            below,
+            farBelow,
+//            eggyelLejjebbEsKettovelJobbrabb,
+            kettovelLejjebbEsEggyelJobbrabb,
+//            kettovelLejjebbEsKettovelJobbrabb
     };
     // =======================
     // 1/A) Lyuk hozzáadása
@@ -67,6 +140,16 @@ public class Agent extends MarioPlayer {
       }
     }
 
+    // és utána mit kezdek a lyukakkal?
+    // ha van előttem lyuk, ugrok.
+    for (int i = 0; i < lyukak.size(); i++) {
+      int elem = lyukak.get(i);
+
+      if (elem == 1 && veszelyesPoziciok[i] == H - 1) {
+        status = Status.JUMPING;
+        return jump;
+      }
+    }
 
     // Ha folyamatban van a lyuk feletti ugrás, akkor tartsuk fent
     if (inHoleJump) {
@@ -188,7 +271,7 @@ public class Agent extends MarioPlayer {
   }
 
   boolean isLowest(int i) {
-    return i == MarioGame.H - 1;
+    return i == H - 1;
   }
 
   ;
