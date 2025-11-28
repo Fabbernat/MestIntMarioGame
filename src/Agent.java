@@ -2,285 +2,390 @@ import game.mario.Direction;
 import game.mario.MarioGame;
 import game.mario.MarioPlayer;
 import game.mario.utils.MarioState;
-
 import java.util.*;
 
-import static game.mario.MarioGame.H;
-
-/**
- * Feljavított Mario Agent.
- * <p>
- * Prioritások:
- * 1. Fal, cső vagy lyuk → ugrás
- * 2. Különleges "ajándék fázis" → állapotgép alapú mozgás
- * 3. Ajándék doboz vizsgálata (magasan vagy egyedül) → ugrás
- * 4. Alapértelmezett mozgás: jobbra
- */
 public class Agent extends MarioPlayer {
-  int INF = Integer.MAX_VALUE / 2;
-  int NINF = Integer.MIN_VALUE / 2;
+  /**
+   *
+   * Egy Agenst keszít.
+   * @param color szine a jatekosnak
+   * @param random random szam
+   * @param state a jatek egy adott allasa
+   */
+
+  public Agent(int color, Random random, MarioState state) {
+    super(color, random, state);
+
+  }
+
+  /**
+   *
+   * A lehetseges akciok
+   * lepes merteke:
+   * V: very small 1 lepes
+   * S: Small 2 lepes
+   * R: Jobbra
+   * L: Balra
+   * UP: Ugras
+   * "": allas
+   */
+  String[] Actions = new String[]{
+          "VR",
+          "VL",
+          "SR",
+          "SL",
+          "R",
+          "L",
+          "U",
+          ""
 
 
-  Direction jump = new Direction(MarioGame.UP);
-  Direction goLeft = new Direction(MarioGame.LEFT);
-  Direction goRight = new Direction(MarioGame.RIGHT);
-  Direction dir;
+  };
 
 
-  double dx; // oldalra speed
-  double dy; // felfele speed
+  class Node implements Comparable<Node> {
+    public Node parent;
+    public MarioState state;
+    public String direction;
+    public double g;
+    public double h;
+    public double f;
 
-  ArrayList<Integer> lyukak = new ArrayList<>();
 
-  enum Status {
-    JUMPING(0),
-    STATIC(1),
-    FALLING(2),
-    LEFT_UP(3),
-    LEFT(4),
-    LEFT_DOWN(5),
-    RIGHT_UP(6),
-    RIGHT(7),
-    RIGHT_DOWN(8);
+    /**
+     *A graf egy adodd csucspontja
+     * @param parent Kitol jutottunk ide
+     * @param state Milyen allapotban vagyunk
+     * @param direction Milyen iranybol jottunk
+     * @param g,h,f g: eddigi utkoltseg, h: hatralevo tavolsag, f: osszkoltseg
+     *
+     */
+    public Node(double g, double h,Node parent, MarioState state, String direction) {
+      this.parent = parent;
+      this.state = state;
+      this.direction = direction;
+      this.g = g;
+      this.h = h;
+      this.f = h+g;
 
-    public final int code;
-
-    Status(int code) {
-      this.code = code;
+    }
+    /**
+     *2 Node osszehasonlitasa f szerint
+     */
+    @Override
+    public int compareTo(Node n) {
+      return Double.compare(this.f, n.f);
     }
   }
 
-  Status status;
-  private boolean valtottUgrasJobbra = false;
-  private boolean inHoleJump = false;
-  private int safeStepsRight = 0;
+  float mainGoal = 2000;
+  float minDistToReach = 40;
+  /**
+   *Tavolsag szamitashoz helper osztaly
+   */
+  class Point {
+    double x, y;
+    public Point(double x, double y) {
+      this.x = x;
+      this.y = y;
+    }
+  }
+
+  double heur(MarioState s) {
+    /**
+     * @param dist a vegtol valo tavolsagunk
+     * @param scroteDist a cel scroetol valo tavolsag
+     * @param supriseDist a legkozelebbi suprise tavolsaga
+     */
+    double dist = Math.max(0, 50 - s.mario.j); // nem negatív
+    double scoreDist = Math.max(0, mainGoal - s.score); // nem negatív
+    double surpriseDist = closestBlock(s, MarioGame.SURPRISE);
+
+    if (surpriseDist > 100) surpriseDist = 100; // maximalizáljuk
+    return surpriseDist*0.6 + dist*0.5 + scoreDist*0.5;
+  }
 
 
   /**
-   * Ajándék fázis állapotgép:
-   * 0 = nincs folyamatban
-   * 1 = első ugrás után jobbra lépés
-   * 2–7 = visszalépések balra
-   * 8–14 = ugrások
-   * 15–16 = jobbra mozgás
-   * 17 = végső ugrás → reset
+   * 12-es melysegben nezzuk hol vannak empty-k,
    */
-  private int ajandek = 0;
+  double closestGodor(MarioState s) {
+    double dist = 10000;
+    Point best = null;
+    try {
+      Point m =  new  Point(s.mario.j,s.mario.i);
+      for(int i = 12; i <= 12; i++) {
+        for(int j =  (int)s.mario.j-2; j <(int)s.mario.j+6; j++) {
+          if(s.map[i][j] == MarioGame.EMPTY) {
+            Point b = new  Point(j,i);
+            double x2 = (b.x-m.x)*(b.x-m.x);
+            double y2 = (b.y-m.y)*(b.y-m.y);
+            double newDist = Math.abs(x2+y2);
+            if(newDist<dist) {
+              dist = newDist;
+              best = b;
+            }
+          }
+        }
+      }}
+    catch (Exception e) {}
 
-  public Agent(int color, Random random, MarioState marioState) {
-    super(color, random, marioState);
+    return dist;
   }
+  /**
+   * Mariotol jobbra 4-el megkeressuk a legkozelebbi keresendo blokk helyet
+   */
+  Double closestBlock(MarioState s, int type) {
+    double dist = 1000;
+    Point best = null;
+    try {
+      Point m =  new  Point(s.mario.j,s.mario.i);
+      for(int i = (int)s.mario.i; i >(int)s.mario.i-4; i--) {
+        for(int j =  (int)s.mario.j; j< (int)s.mario.j+4; j++) {
+          if(s.map[i][j] == type) {
+            Point b = new  Point(j,i);
+
+            double x2 = (b.x-m.x)*(b.x-m.x);
+            double y2 = (b.y-m.y)*(b.y-m.y);
+            double newDist = Math.abs(x2+y2);
+            if(newDist<dist) {
+              dist = newDist;
+              best = b;
+            }
+          }
+        }
+      }}
+    catch (Exception e) {}
+
+    return dist;
+  }
+  /**
+   * Atalakitjuk a megkapott irany Strignet Directionne es egy listaban visszaadjuk.
+   * @return List<Direction>
+   */
+  List<Direction> converter(String dir) {
+    List<Direction> dirs = new ArrayList<>();
+    int db = 4;
+    if(dir.contains("S")) {db = 2;}
+    if(dir.contains("V")) {db = 1;}
+    if(dir.contains("R")) {
+      for(int i = 0; i < db; i++) {
+        dirs.add(new Direction(MarioGame.RIGHT));
+      }
+    }
+    if(dir.contains("L")) {
+      for(int i = 0; i <db; i++) {
+        dirs.add(new Direction(MarioGame.LEFT));
+      }
+    }
+    if(dir.contains("U") || dir.equals("UP")) {
+      for(int i = 0; i <db; i++) {
+        dirs.add(new Direction(MarioGame.UP));
+      }
+
+
+    }
+    if(dir.contains("N") || dir.isEmpty()) {
+      dirs.add(null);
+
+    }
+
+    return  dirs;
+  }
+  /**
+   * @param maxDepth milyen sokaig menjen le az kereses
+   * @param depth jelenlegi melyseg
+   *
+   */
+  double maxDepth = 1000;
+  double depth = 0;
+
+
+
+  List<Direction> aStar(MarioState start) {
+    /**
+     * @param open Az elerheto utak, mindig a legjobb f erteku van elol
+     * @param bestF elso erteke a kulcs ami alapjan tudjuk hogy erre jartunk-e mar, erteke a node f  erteke, mindig a jelenlegi legjobbakat tesszuk bele.
+     * @param first a kezdeti elso csomopontunk
+     */
+    PriorityQueue<Node> open = new PriorityQueue<>();
+    Map<String, Double> bestF = new HashMap<>();
+    Node first = new Node(start.distance,MarioGame.W,null,start,null);
+    open.add(first);
+    /**
+     * Az elerheto utakhoz hozzáadjuk az első kiindulo csucsot
+     * Kivesszuk az openbol
+     * Megnezzuk hogy elertuk e a celunkat, vagy a melyseget, ha igen visszaadjuk az ide vezeto utat
+     * Kiterjesztjuk a jelenlegi csucspontunkat, az Action osszes utjara leuttatjuk az adott allapotot
+     */
+
+    while (!open.isEmpty()) {
+      depth++;
+      Node current = open.poll();
+      if(isGoal(current) || depth >maxDepth) {
+        depth = 0;
+        return path(current);
+      }
+      double prevDist = MarioGame.W+1-current.state.mario.j;
+      for(String dir : Actions) {
+        MarioState s = new MarioState(current.state);
+        double tileCost = 1;
+
+        /**
+         * @param tileCose extra utikoltseg
+         **/
+
+
+        tileCost += Math.min(1, 1/closestGodor(s)); // max 1 extra
+
+
+        try {
+          int kernel[][] = new int[3][3];
+          /**
+           * @param kernel, mario a kozepe
+           **/
+          for(int i = (int)s.mario.i-1; i > (int)s.mario.i+1; i++) {
+            for(int j = (int)s.mario.j-1; j > (int)s.mario.j+1; j++) {
+              kernel[i][j] = s.map[i][j];
+            }
+          }
+
+/**
+ * Ha egy fal vagy cso van felettunk
+ **/
+          if(kernel[0][1] == MarioGame.WALL  &&kernel[0][2] == MarioGame.WALL || kernel[0][1] == MarioGame.PIPE  &&kernel[0][2] == MarioGame.PIPE) {
+            tileCost+=1;
+          }
+/**
+ * ha 11-es y szinten vagyunk es alattunk Empty van;
+ **/
+
+          if(s.mario.i >= 12) {
+            if(kernel[2][1] == MarioGame.EMPTY  || kernel[2][2]== MarioGame.EMPTY  || kernel[2][0]== MarioGame.EMPTY) {
+              tileCost+=1;
+            }
+
+
+            if(kernel[2][1] != MarioGame.EMPTY  && kernel[2][2]!= MarioGame.EMPTY) {
+              tileCost-=2;
+            }
+
+          }
+
+        }catch (Exception e) {}
+
+        try {
+          for(Direction d : converter(dir)) {
+            /**
+             * iranyok hozzaadasa, ha false azt azt jelenti hogy ott meghaltunk
+             **/
+            if(s.apply(d) == false) {tileCost +=100;} ;
+          }
+
+        } catch (Exception e) {};
+
+        try {
+          int kernel[][] = new int[3][3];
+          for(int i = (int)s.mario.i-1; i > (int)s.mario.i+1; i++) {
+            for(int j = (int)s.mario.j-1; j > (int)s.mario.j+1; j++) {
+              kernel[i][j] = s.map[i][j];
+            }
+          }
+
+          /**
+           * Ha mozgasok utan ismet empty van alattunk
+           **/
+
+          if(s.mario.i >= 11) {
+            if(kernel[2][1] == MarioGame.EMPTY  || kernel[2][2]== MarioGame.EMPTY) {
+              tileCost+=10;
+            }
+            if(kernel[2][1] != MarioGame.EMPTY  || kernel[2][2]!= MarioGame.EMPTY  || kernel[2][0]!= MarioGame.EMPTY) {
+              tileCost-=10;
+            }
+
+          }
+
+          //    if(s.isInAir){tileCost+=0.8;}
+        }catch (Exception e) {}
+
+        /***
+         * Ha elötte egy 5 magas fal van akkor ha nincs elég nagy sebessége ne közelítse meg
+         *
+         * **/
+
+
+        if(prevDist >= s.distance) {tileCost+=3;}
+        /**
+         * Ha nem erte el a kello pontszámot, +koltseg
+         **/
+
+        if(s.score <1000) {tileCost +=3;}
+        else if(s.score <2000) {tileCost += 1;}
+/**
+ * Eltaroljuk a csucspontot, letrehozzuk egy kulcsot, fontos hogy ne legyen tul egyedi. ez alapjan hivatkozunk ra
+ **/
+        Node n = new Node(current.g+tileCost,heur(s),current,s,dir);
+
+        String key = s.mario.i + ":" + s.mario.j + ":" + s.isInAir;
+        if (!bestF.containsKey(key) || n.f < bestF.get(key)) {
+          bestF.put(key, n.f);
+          open.add(n);
+        }
+
+      }
+
+    }
+    return null;
+  }
+  /**
+   * A megadott csomoponttol visszafele a parenteken keresztul eljut a root csomopontig, majd az egeszet megfordítja
+   **/
+  List<Direction> path(Node node) {
+    List<Direction> path = new ArrayList<>();
+    Node current = node;
+    while (current != null) {
+      if (current.direction != null) {
+        for(Direction d : converter(current.direction)) {
+          path.add(d);
+        }
+      }
+      current = current.parent;
+    }
+    Collections.reverse(path);
+    return path;
+  }
+  /**
+   * Ha elertük a kívant celt igazzal terunk vissza, a celt mindig kicsivel megemeljük.
+   **/
+  boolean isGoal(Node node) {
+    if(node.state.score >= mainGoal) { mainGoal+=500; return true;}
+    if(node.state.distance >= minDistToReach) {minDistToReach+=20;return true;}
+    return false;
+  }
+  /**
+   * @param lepesek az aStar altal visszaadott lepeseket ebben taroljuk és mindig csak az elso lepest vesszük ki minden getDirection hivaskor. Ha ures ne csinaljuk semmit.
+   *  a state apply-t try-ba kell beletenni mert kepes index out of bounds-ot dobni.
+   **/
+  List<Direction> lepesek = new ArrayList<>();
 
   @Override
   public Direction getDirection(long remainingTime) {
 
-    int[][] map = state.map;
-    int height = map.length;
-    int width = map[0].length;
+    if(lepesek == null || lepesek.isEmpty()) {
 
-
-    double rowD = state.mario.i;
-    double colD = state.mario.j;
-
-    // -- sor és oszlop változókba elmentve
-    int row = (int) Math.round(rowD);
-    int col = (int) Math.round(colD);
-
-    // --- Környezeti blokkok változókba elmentve---
-    //leftek
-    int left = getSafeBlock(row, col - 1);
-    int leftBelow = getSafeBlock(row - 1, col - 1);
-    int leftAbove = getSafeBlock(row + 1, col - 1);
-
-    //rightok
-    int right = getSafeBlock(row, col + 1);
-    int rightBelow = getSafeBlock(row - 1, col + 1);
-    int rightAbove = getSafeBlock(row + 1, col + 1);
-
-    //le
-    int below = getSafeBlock(row - 1, col);
-
-    //fel
-    int above = getSafeBlock(row + 1, col);
-
-    // 2-re levok
-    int farLeft = getSafeBlock(row, col - 2);
-    int farRight = getSafeBlock(row, col + 2);
-    int farBelow = getSafeBlock(row + 2, col);
-    int farAbove = getSafeBlock(row - 2, col);
-
-    // 3-ra levok
-    int furthestLeft = getSafeBlock(row, col - 3);
-    int furthestRight = getSafeBlock(row, col + 3);
-    int furthestBelow = getSafeBlock(row + 3, col);
-    int furthestAbove = getSafeBlock(row - 3, col);
-
-    // 2-1 és 2-2 delták
-    int eggyelLejjebbEsKettovelJobbrabb = getSafeBlock(row + 1, col + 2);
-    int kettovelLejjebbEsKettovelJobbrabb = getSafeBlock(row + 2, col + 2);
-    int kettovelLejjebbEsEggyelJobbrabb = getSafeBlock(row + 2, col + 1);
-
-    int kettovelFeljebbEsEggyelJobbrabb = getSafeBlock(row - 2, col + 1);
-
-    int[] veszelyesPoziciok = new int[]{
-            rightBelow,
-            below,
-            farBelow,
-//            eggyelLejjebbEsKettovelJobbrabb,
-            kettovelLejjebbEsEggyelJobbrabb,
-//            kettovelLejjebbEsKettovelJobbrabb
-    };
-    // =======================
-    // 1/A) Lyuk hozzáadása
-    // =======================
-    lyukak.clear();
-    for (int aktVeszPoz : veszelyesPoziciok) {
-      if (aktVeszPoz == MarioGame.EMPTY) {
-        lyukak.add(1);  // csak egy flag-szerű érték, hogy van lyuk
-      }
+      lepesek = aStar(state);
     }
-
-    // és utána mit kezdek a lyukakkal?
-    // ha van előttem lyuk, ugrok.
-    for (int i = 0; i < lyukak.size(); i++) {
-      int elem = lyukak.get(i);
-
-      if (elem == 1 && veszelyesPoziciok[i] == H - 1) {
-        status = Status.JUMPING;
-        return jump;
-      }
+    if(lepesek == null || lepesek.isEmpty()) {
+      return null;
     }
-
-    // Ha folyamatban van a lyuk feletti ugrás, akkor tartsuk fent
-    if (inHoleJump) {
-
-      // Amíg alatta a legalsó szint EMPTY, addig folytasd az ugrást
-      int under = getSafeBlock(row - 1, col);
-      if (under == MarioGame.EMPTY && isLowest(under)) {
-        return jump;  // továbbra is felfelé
-      }
-
-      // Ha már nem a lyuk ovan -> kezdődhet a biztonságos jobbra lépkedés
-      if (safeStepsRight == 0) {
-        safeStepsRight = 3;  // ennyi lépés jobbra biztonságból
-      }
-    }
-
-// Ha épp biztonsági jobbra-lépést kell tenni
-    if (safeStepsRight > 0) {
-      safeStepsRight--;
-      if (safeStepsRight == 0) {
-        inHoleJump = false; // vége a lyuk-szekvenciának
-      }
-      return goRight;
-    }
-
-
-    /**
-     * Ha van lyuk a lyukakban, azaz van veszelyesPozicio a közelben, akkor
-     * Ha a below lyuk, akkor
-     * - ha a rightBelow is lyuk, akkor balra megyünk
-     * - ha a rightBelow nem lyuk, akkor jobbra megyünk.
-     *
-     * Ha a farBelow lyuk, akkor minden esetben jobbra tartunk. Ez azért lehetséges, mert a játékban garantált, hogy csak legfeljebb 2 nagyságú lyukak lesznek, és a lyuk végén nem lesz fal.
-     *
-     * - Ha a rightBelow, vagy a kettovelLejjebbEsEggyelJobbrabb nem lyuk, akkor jobbra megyünk.  (legyen egy // Ha a rightBelow, vagy a kettovelLejjebbEsEggyelJobbrabb nem lyuk, akkor jobbra megyünk. komment ott!).
-     *
-     * - Minden egyéb esetben felváltva UP és RIGHT műveleteket adunk ki ( jobbrafelé ugrunk).
-     */
-
-    // =======================
-    // LYUK LOGIKA
-    // =======================
-    // Ha van bármilyen lyuk (veszélyesPozíció) a listában:
-    if (!lyukak.isEmpty()) {
-
-      // Ha a below lyuk
-      if (below == MarioGame.EMPTY && isLowest(below)) {
-
-        // - ha a rightBelow is lyuk → menjünk BALRA
-        if (rightBelow == MarioGame.EMPTY && isLowest(rightBelow)) {
-          return goLeft;
-        }
-
-        // - ha a rightBelow nem lyuk → doABaseMovement
-        else {
-          dir = doABaseMovement();
-          return dir;
-        }
-      }
-
-      // Ha a farBelow lyuk → doABaseMovement
-      if (farBelow == MarioGame.EMPTY) {
-        dir = doABaseMovement();
-        return dir;
-      }
-
-      // Ha a rightBelow vagy a kettovelLejjebbEsEggyelJobbrabb nem lyuk → jobbra
-      if (rightBelow != MarioGame.EMPTY || kettovelLejjebbEsEggyelJobbrabb != MarioGame.EMPTY) {
-        return goRight;
-      }
-
-      // Itt indul az "ugrunk egy lyuk felett" állapot
-      inHoleJump = true;
-
-      // Minden egyéb helyzetben felváltva UP és RIGHT (jobbrafelé ugrás)
-      if (!valtottUgrasJobbra) {
-        valtottUgrasJobbra = true;
-        state.apply(jump);
-        return jump;
-      } else {
-        valtottUgrasJobbra = false;
-        state.apply(goRight);
-        return goRight;
-      }
+    Direction d = lepesek.remove(0);
+    try {    state.apply(d);} catch (Exception e) {
 
     }
 
-
-    // =======================
-    // Fal / Pipe
-    // =======================
-    if (right == MarioGame.WALL || right == MarioGame.PIPE) {
-      return jump;
-    }
-
-    // =======================
-    // Alap mozgás véletlen alapján: általában fel, néha jobbra és csak ritkán balra
-    // =======================
-
-    return doABaseMovement();
-  }
-
-  private Direction doABaseMovement() {
-    // --- nyomi változóim ---
-    int leftetEldontoBound = 11;
-    int konkretLeftHatar = 2;
-
-    int threshold = random.nextInt(leftetEldontoBound);
-    if (threshold < konkretLeftHatar) {
-      return goLeft;
-    } else {
-      int felVagyJobbra = random.nextInt(3);
-      if (felVagyJobbra < 1) {
-        return jump;
-      } else {
-        return goRight;
-      }
-    }
-  }
-
-  boolean isLowest(int i) {
-    return i == H - 1;
-  }
-
-  ;
+    return d;
 
 
-  private int getSafeBlock(int row, int col) {
-    if (row < 0 || col < 0) return MarioGame.EMPTY;
-    if (row >= state.map.length) return MarioGame.EMPTY;
-    if (col >= state.map[row].length) return MarioGame.EMPTY;
-    return state.map[row][col];
   }
 }
