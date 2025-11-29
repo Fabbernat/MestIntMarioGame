@@ -1,49 +1,276 @@
 import game.mario.Direction;
-import game.mario.MarioGame;
 import game.mario.MarioPlayer;
 import game.mario.utils.MarioState;
-import java.util.*;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.PriorityQueue;
+import java.util.Random;
+
+import static game.mario.MarioGame.EMPTY;
 
 public class Agent extends MarioPlayer {
-  /**
-   *
-   * Egy Agenst keszít.
-   * @param color szine a jatekosnak
-   * @param random random szam
-   * @param state a jatek egy adott allasa
-   */
+  String[] Actions = new String[]{"VR", "VL", "SR", "SL", "R", "L", "U", ""};
+  float mainGoal = 2000.0F;
+  float minDistToReach = 40.0F;
+  double maxDepth = 1000.0F;
+  double depth = 0.0F;
+  List<Direction> lepesek = new ArrayList<>();
 
   public Agent(int color, Random random, MarioState state) {
     super(color, random, state);
-
   }
 
-  /**
-   *
-   * A lehetseges akciok
-   * lepes merteke:
-   * V: very small 1 lepes
-   * S: Small 2 lepes
-   * R: Jobbra
-   * L: Balra
-   * UP: Ugras
-   * "": allas
-   */
-  String[] Actions = new String[]{
-          "VR",
-          "VL",
-          "SR",
-          "SL",
-          "R",
-          "L",
-          "U",
-          ""
+  public Direction getDirection(long remainingTime) {
 
+    // Ha még nincs adat a lépésekben,
+    if (this.lepesek == null || this.lepesek.isEmpty()) {
+      // akkor meghívjuk az A* algoritmust, amely kiszámolja az összes lépést.
+      this.lepesek = this.aStar(this.state);
+    }
 
-  };
+    /** Különben töröljük és alkalmazzuk az 1. lépést a "lepesek"-ből.
+     * "removeFirst"-tel nem működik.
+     */
+    if (this.lepesek != null && !this.lepesek.isEmpty()) {
+      Direction aktualisLepes = this.lepesek.remove(0);
 
+      // Enelkul rosszul működik
+      try {
+        this.state.apply(aktualisLepes);
+      } catch (Exception ignored) {
+      }
 
-  class Node implements Comparable<Node> {
+      return aktualisLepes;
+    } else {
+      return null;
+    }
+  }
+
+  double heurisztika(MarioState state) {
+    double aktOszlopIndex = Math.max(0.0F, (double) 50.0F - state.mario.j); // Nem lehet negatív!
+    double hajlam = Math.max(0.0F, (double) this.mainGoal - state.score); // Nem lehet negatív!
+    double legkozelebbiLyuk = this.closestBlock(state);
+    if (legkozelebbiLyuk > (double) 100.0F) {
+      legkozelebbiLyuk = 100.0F;
+    }
+
+    return legkozelebbiLyuk * 0.6 + aktOszlopIndex * (double) 0.5F + hajlam * (double) 0.5F;
+  }
+
+  double closestHole(MarioState state) {
+    double hatarertek = 10000.0F;
+    Object legjobb = null;
+
+    try {
+      Point aktMarioPozicio = new Point(state.mario.j, state.mario.i);
+
+      // Lyuk kereső algoritmus a pálya alján (csak ott lehet)
+      for (int i = (int) state.mario.j - 2; i < (int) state.mario.j + 6; ++i) {
+        if (state.map[12][i] == EMPTY) {
+          Point pont = new Point(i, 12);
+          double var9 = (pont.x - aktMarioPozicio.x) * (pont.x - aktMarioPozicio.x);
+          double var11 = (pont.y - aktMarioPozicio.y) * (pont.y - aktMarioPozicio.y);
+          double var13 = Math.abs(var9 + var11);
+          if (var13 < hatarertek) {
+            hatarertek = var13;
+          }
+        }
+      }
+    } catch (Exception ignored) {
+    }
+
+    return hatarertek;
+  }
+
+  Double closestBlock(MarioState var1) {
+    double var2 = 1000.0F;
+    Object var4 = null;
+
+    try {
+      Point var5 = new Point(var1.mario.j, var1.mario.i);
+
+      for (int var6 = (int) var1.mario.i; var6 > (int) var1.mario.i - 4; --var6) {
+        for (int var7 = (int) var1.mario.j; var7 < (int) var1.mario.j + 4; ++var7) {
+          if (var1.map[var6][var7] == 3) {
+            Point var8 = new Point(var7, var6);
+            double var9 = (var8.x - var5.x) * (var8.x - var5.x);
+            double var11 = (var8.y - var5.y) * (var8.y - var5.y);
+            double var13 = Math.abs(var9 + var11);
+            if (var13 < var2) {
+              var2 = var13;
+            }
+          }
+        }
+      }
+    } catch (Exception ignored) {
+    }
+
+    return var2;
+  }
+
+  ArrayList<Direction> converter(String var1) {
+    ArrayList var2 = new ArrayList();
+    byte var3 = 4;
+    if (var1.contains("S")) {
+      var3 = 2;
+    }
+
+    if (var1.contains("V")) {
+      var3 = 1;
+    }
+
+    if (var1.contains("R")) {
+      for (int var4 = 0; var4 < var3; ++var4) {
+        var2.add(new Direction(0));
+      }
+    }
+
+    if (var1.contains("L")) {
+      for (int var5 = 0; var5 < var3; ++var5) {
+        var2.add(new Direction(2));
+      }
+    }
+
+    if (var1.contains("U") || var1.equals("UP")) {
+      for (int var6 = 0; var6 < var3; ++var6) {
+        var2.add(new Direction(1));
+      }
+    }
+
+    if (var1.contains("N") || var1.isEmpty()) {
+      var2.add(null);
+    }
+
+    return var2;
+  }
+
+  List<Direction> aStar(MarioState var1) {
+    PriorityQueue var2 = new PriorityQueue();
+    HashMap var3 = new HashMap();
+    Node var4 = new Node(var1.distance, 100.0F, (Node) null, var1, (String) null);
+    var2.add(var4);
+
+    while (!var2.isEmpty()) {
+      ++this.depth;
+      Node var5 = (Node) var2.poll();
+      if (this.isGoal(var5) || this.depth > this.maxDepth) {
+        this.depth = 0.0F;
+        return this.path(var5);
+      }
+
+      double var6 = (double) 101.0F - var5.state.mario.j;
+
+      for (String var11 : this.Actions) {
+        MarioState var12 = new MarioState(var5.state);
+        double var13 = 1.0F;
+        var13 += Math.min(1.0F, (double) 1.0F / this.closestHole(var12));
+
+        try {
+          int[][] var15 = new int[3][3];
+
+          for (int var16 = (int) var12.mario.i - 1; var16 > (int) var12.mario.i + 1; ++var16) {
+            for (int var17 = (int) var12.mario.j - 1; var17 > (int) var12.mario.j + 1; ++var17) {
+              var15[var16][var17] = var12.map[var16][var17];
+            }
+          }
+
+          if (var15[0][1] == 1 && var15[0][2] == 1 || var15[0][1] == 2 && var15[0][2] == 2) {
+            ++var13;
+          }
+
+          if (var12.mario.i >= (double) 12.0F) {
+            if (var15[2][1] == 0 || var15[2][2] == 0 || var15[2][0] == 0) {
+              ++var13;
+            }
+
+            if (var15[2][1] != 0 && var15[2][2] != 0) {
+              var13 -= 2.0F;
+            }
+          }
+        } catch (Exception var18) {
+        }
+
+        try {
+          for (Direction var25 : this.converter(var11)) {
+            if (!var12.apply(var25)) {
+              var13 += 100.0F;
+            }
+          }
+        } catch (Exception var19) {
+        }
+
+        try {
+          int[][] var23 = new int[3][3];
+
+          for (int var26 = (int) var12.mario.i - 1; var26 > (int) var12.mario.i + 1; ++var26) {
+            for (int var28 = (int) var12.mario.j - 1; var28 > (int) var12.mario.j + 1; ++var28) {
+              var23[var26][var28] = var12.map[var26][var28];
+            }
+          }
+
+          if (var12.mario.i >= (double) 11.0F) {
+            if (var23[2][1] == 0 || var23[2][2] == 0) {
+              var13 += 10.0F;
+            }
+
+            if (var23[2][1] != 0 || var23[2][2] != 0 || var23[2][0] != 0) {
+              var13 -= 10.0F;
+            }
+          }
+        } catch (Exception ignored) {
+        }
+
+        if (var6 >= var12.distance) {
+          var13 += 3.0F;
+        }
+
+        if (var12.score < (double) 1000.0F) {
+          var13 += 3.0F;
+        } else if (var12.score < (double) 2000.0F) {
+          ++var13;
+        }
+
+        Node var24 = new Node(var5.g + var13, this.heurisztika(var12), var5, var12, var11);
+        String var27 = var12.mario.i + ":" + var12.mario.j + ":" + var12.isInAir;
+        if (!var3.containsKey(var27) || var24.f < (Double) var3.get(var27)) {
+          var3.put(var27, var24.f);
+          var2.add(var24);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  ArrayList<Direction> path(Node var1) {
+    ArrayList var2 = new ArrayList();
+
+    for (Node var3 = var1; var3 != null; var3 = var3.parent) {
+      if (var3.direction != null) {
+        var2.addAll(this.converter(var3.direction));
+      }
+    }
+
+    Collections.reverse(var2);
+    return var2;
+  }
+
+  boolean isGoal(Node var1) {
+    if (var1.state.score >= (double) this.mainGoal) {
+      this.mainGoal += 500.0F;
+      return true;
+    } else if (var1.state.distance >= (double) this.minDistToReach) {
+      this.minDistToReach += 20.0F;
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  static class Node implements Comparable<Node> {
     public Node parent;
     public MarioState state;
     public String direction;
@@ -51,341 +278,27 @@ public class Agent extends MarioPlayer {
     public double h;
     public double f;
 
-
-    /**
-     *A graf egy adodd csucspontja
-     * @param parent Kitol jutottunk ide
-     * @param state Milyen allapotban vagyunk
-     * @param direction Milyen iranybol jottunk
-     * @param g,h,f g: eddigi utkoltseg, h: hatralevo tavolsag, f: osszkoltseg
-     *
-     */
-    public Node(double g, double h,Node parent, MarioState state, String direction) {
-      this.parent = parent;
-      this.state = state;
-      this.direction = direction;
-      this.g = g;
-      this.h = h;
-      this.f = h+g;
-
+    public Node(double var1, double var3, Node var5, MarioState var6, String var7) {
+      this.parent = var5;
+      this.state = var6;
+      this.direction = var7;
+      this.g = var1;
+      this.h = var3;
+      this.f = var3 + var1;
     }
-    /**
-     *2 Node osszehasonlitasa f szerint
-     */
-    @Override
-    public int compareTo(Node n) {
-      return Double.compare(this.f, n.f);
+
+    public int compareTo(Node var1) {
+      return Double.compare(this.f, var1.f);
     }
   }
 
-  float mainGoal = 2000;
-  float minDistToReach = 40;
-  /**
-   *Tavolsag szamitashoz helper osztaly
-   */
-  class Point {
-    double x, y;
-    public Point(double x, double y) {
-      this.x = x;
-      this.y = y;
+  static class Point {
+    double x;
+    double y;
+
+    public Point(double var1, double var3) {
+      this.x = var1;
+      this.y = var3;
     }
-  }
-
-  double heur(MarioState s) {
-    /**
-     * @param dist a vegtol valo tavolsagunk
-     * @param scroteDist a cel scroetol valo tavolsag
-     * @param supriseDist a legkozelebbi suprise tavolsaga
-     */
-    double dist = Math.max(0, 50 - s.mario.j); // nem negatív
-    double scoreDist = Math.max(0, mainGoal - s.score); // nem negatív
-    double surpriseDist = closestBlock(s, MarioGame.SURPRISE);
-
-    if (surpriseDist > 100) surpriseDist = 100; // maximalizáljuk
-    return surpriseDist*0.6 + dist*0.5 + scoreDist*0.5;
-  }
-
-
-  /**
-   * 12-es melysegben nezzuk hol vannak empty-k,
-   */
-  double closestGodor(MarioState s) {
-    double dist = 10000;
-    Point best = null;
-    try {
-      Point m =  new  Point(s.mario.j,s.mario.i);
-      for(int i = 12; i <= 12; i++) {
-        for(int j =  (int)s.mario.j-2; j <(int)s.mario.j+6; j++) {
-          if(s.map[i][j] == MarioGame.EMPTY) {
-            Point b = new  Point(j,i);
-            double x2 = (b.x-m.x)*(b.x-m.x);
-            double y2 = (b.y-m.y)*(b.y-m.y);
-            double newDist = Math.abs(x2+y2);
-            if(newDist<dist) {
-              dist = newDist;
-              best = b;
-            }
-          }
-        }
-      }}
-    catch (Exception e) {}
-
-    return dist;
-  }
-  /**
-   * Mariotol jobbra 4-el megkeressuk a legkozelebbi keresendo blokk helyet
-   */
-  Double closestBlock(MarioState s, int type) {
-    double dist = 1000;
-    Point best = null;
-    try {
-      Point m =  new  Point(s.mario.j,s.mario.i);
-      for(int i = (int)s.mario.i; i >(int)s.mario.i-4; i--) {
-        for(int j =  (int)s.mario.j; j< (int)s.mario.j+4; j++) {
-          if(s.map[i][j] == type) {
-            Point b = new  Point(j,i);
-
-            double x2 = (b.x-m.x)*(b.x-m.x);
-            double y2 = (b.y-m.y)*(b.y-m.y);
-            double newDist = Math.abs(x2+y2);
-            if(newDist<dist) {
-              dist = newDist;
-              best = b;
-            }
-          }
-        }
-      }}
-    catch (Exception e) {}
-
-    return dist;
-  }
-  /**
-   * Atalakitjuk a megkapott irany Strignet Directionne es egy listaban visszaadjuk.
-   * @return List<Direction>
-   */
-  List<Direction> converter(String dir) {
-    List<Direction> dirs = new ArrayList<>();
-    int db = 4;
-    if(dir.contains("S")) {db = 2;}
-    if(dir.contains("V")) {db = 1;}
-    if(dir.contains("R")) {
-      for(int i = 0; i < db; i++) {
-        dirs.add(new Direction(MarioGame.RIGHT));
-      }
-    }
-    if(dir.contains("L")) {
-      for(int i = 0; i <db; i++) {
-        dirs.add(new Direction(MarioGame.LEFT));
-      }
-    }
-    if(dir.contains("U") || dir.equals("UP")) {
-      for(int i = 0; i <db; i++) {
-        dirs.add(new Direction(MarioGame.UP));
-      }
-
-
-    }
-    if(dir.contains("N") || dir.isEmpty()) {
-      dirs.add(null);
-
-    }
-
-    return  dirs;
-  }
-  /**
-   * @param maxDepth milyen sokaig menjen le az kereses
-   * @param depth jelenlegi melyseg
-   *
-   */
-  double maxDepth = 1000;
-  double depth = 0;
-
-
-
-  List<Direction> aStar(MarioState start) {
-    /**
-     * @param open Az elerheto utak, mindig a legjobb f erteku van elol
-     * @param bestF elso erteke a kulcs ami alapjan tudjuk hogy erre jartunk-e mar, erteke a node f  erteke, mindig a jelenlegi legjobbakat tesszuk bele.
-     * @param first a kezdeti elso csomopontunk
-     */
-    PriorityQueue<Node> open = new PriorityQueue<>();
-    Map<String, Double> bestF = new HashMap<>();
-    Node first = new Node(start.distance,MarioGame.W,null,start,null);
-    open.add(first);
-    /**
-     * Az elerheto utakhoz hozzáadjuk az első kiindulo csucsot
-     * Kivesszuk az openbol
-     * Megnezzuk hogy elertuk e a celunkat, vagy a melyseget, ha igen visszaadjuk az ide vezeto utat
-     * Kiterjesztjuk a jelenlegi csucspontunkat, az Action osszes utjara leuttatjuk az adott allapotot
-     */
-
-    while (!open.isEmpty()) {
-      depth++;
-      Node current = open.poll();
-      if(isGoal(current) || depth >maxDepth) {
-        depth = 0;
-        return path(current);
-      }
-      double prevDist = MarioGame.W+1-current.state.mario.j;
-      for(String dir : Actions) {
-        MarioState s = new MarioState(current.state);
-        double tileCost = 1;
-
-        /**
-         * @param tileCose extra utikoltseg
-         **/
-
-
-        tileCost += Math.min(1, 1/closestGodor(s)); // max 1 extra
-
-
-        try {
-          int kernel[][] = new int[3][3];
-          /**
-           * @param kernel, mario a kozepe
-           **/
-          for(int i = (int)s.mario.i-1; i > (int)s.mario.i+1; i++) {
-            for(int j = (int)s.mario.j-1; j > (int)s.mario.j+1; j++) {
-              kernel[i][j] = s.map[i][j];
-            }
-          }
-
-/**
- * Ha egy fal vagy cso van felettunk
- **/
-          if(kernel[0][1] == MarioGame.WALL  &&kernel[0][2] == MarioGame.WALL || kernel[0][1] == MarioGame.PIPE  &&kernel[0][2] == MarioGame.PIPE) {
-            tileCost+=1;
-          }
-/**
- * ha 11-es y szinten vagyunk es alattunk Empty van;
- **/
-
-          if(s.mario.i >= 12) {
-            if(kernel[2][1] == MarioGame.EMPTY  || kernel[2][2]== MarioGame.EMPTY  || kernel[2][0]== MarioGame.EMPTY) {
-              tileCost+=1;
-            }
-
-
-            if(kernel[2][1] != MarioGame.EMPTY  && kernel[2][2]!= MarioGame.EMPTY) {
-              tileCost-=2;
-            }
-
-          }
-
-        }catch (Exception e) {}
-
-        try {
-          for(Direction d : converter(dir)) {
-            /**
-             * iranyok hozzaadasa, ha false azt azt jelenti hogy ott meghaltunk
-             **/
-            if(s.apply(d) == false) {tileCost +=100;} ;
-          }
-
-        } catch (Exception e) {};
-
-        try {
-          int kernel[][] = new int[3][3];
-          for(int i = (int)s.mario.i-1; i > (int)s.mario.i+1; i++) {
-            for(int j = (int)s.mario.j-1; j > (int)s.mario.j+1; j++) {
-              kernel[i][j] = s.map[i][j];
-            }
-          }
-
-          /**
-           * Ha mozgasok utan ismet empty van alattunk
-           **/
-
-          if(s.mario.i >= 11) {
-            if(kernel[2][1] == MarioGame.EMPTY  || kernel[2][2]== MarioGame.EMPTY) {
-              tileCost+=10;
-            }
-            if(kernel[2][1] != MarioGame.EMPTY  || kernel[2][2]!= MarioGame.EMPTY  || kernel[2][0]!= MarioGame.EMPTY) {
-              tileCost-=10;
-            }
-
-          }
-
-          //    if(s.isInAir){tileCost+=0.8;}
-        }catch (Exception e) {}
-
-        /***
-         * Ha elötte egy 5 magas fal van akkor ha nincs elég nagy sebessége ne közelítse meg
-         *
-         * **/
-
-
-        if(prevDist >= s.distance) {tileCost+=3;}
-        /**
-         * Ha nem erte el a kello pontszámot, +koltseg
-         **/
-
-        if(s.score <1000) {tileCost +=3;}
-        else if(s.score <2000) {tileCost += 1;}
-/**
- * Eltaroljuk a csucspontot, letrehozzuk egy kulcsot, fontos hogy ne legyen tul egyedi. ez alapjan hivatkozunk ra
- **/
-        Node n = new Node(current.g+tileCost,heur(s),current,s,dir);
-
-        String key = s.mario.i + ":" + s.mario.j + ":" + s.isInAir;
-        if (!bestF.containsKey(key) || n.f < bestF.get(key)) {
-          bestF.put(key, n.f);
-          open.add(n);
-        }
-
-      }
-
-    }
-    return null;
-  }
-  /**
-   * A megadott csomoponttol visszafele a parenteken keresztul eljut a root csomopontig, majd az egeszet megfordítja
-   **/
-  List<Direction> path(Node node) {
-    List<Direction> path = new ArrayList<>();
-    Node current = node;
-    while (current != null) {
-      if (current.direction != null) {
-        for(Direction d : converter(current.direction)) {
-          path.add(d);
-        }
-      }
-      current = current.parent;
-    }
-    Collections.reverse(path);
-    return path;
-  }
-  /**
-   * Ha elertük a kívant celt igazzal terunk vissza, a celt mindig kicsivel megemeljük.
-   **/
-  boolean isGoal(Node node) {
-    if(node.state.score >= mainGoal) { mainGoal+=500; return true;}
-    if(node.state.distance >= minDistToReach) {minDistToReach+=20;return true;}
-    return false;
-  }
-  /**
-   * @param lepesek az aStar altal visszaadott lepeseket ebben taroljuk és mindig csak az elso lepest vesszük ki minden getDirection hivaskor. Ha ures ne csinaljuk semmit.
-   *  a state apply-t try-ba kell beletenni mert kepes index out of bounds-ot dobni.
-   **/
-  List<Direction> lepesek = new ArrayList<>();
-
-  @Override
-  public Direction getDirection(long remainingTime) {
-
-    if(lepesek == null || lepesek.isEmpty()) {
-
-      lepesek = aStar(state);
-    }
-    if(lepesek == null || lepesek.isEmpty()) {
-      return null;
-    }
-    Direction d = lepesek.remove(0);
-    try {    state.apply(d);} catch (Exception e) {
-
-    }
-
-    return d;
-
-
   }
 }
