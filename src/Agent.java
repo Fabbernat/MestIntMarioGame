@@ -194,29 +194,29 @@ public class Agent extends MarioPlayer {
         }
 
         try {
-          for (Direction var25 : this.converter(akcio)) {
-            if (!aktState.apply(var25)) {
+          for (Direction aktDirection : this.converter(akcio)) {
+            if (!aktState.apply(aktDirection)) {
               f += 100.0F;
             }
           }
-        } catch (Exception var19) {
+        } catch (Exception ignored) {
         }
 
         try {
-          int[][] var23 = new int[3][3];
+          int[][] minimap = new int[3][3];
 
-          for (int var26 = (int) aktState.mario.i - 1; var26 > (int) aktState.mario.i + 1; ++var26) {
-            for (int var28 = (int) aktState.mario.j - 1; var28 > (int) aktState.mario.j + 1; ++var28) {
-              var23[var26][var28] = aktState.map[var26][var28];
+          for (int i = (int) aktState.mario.i - 1; i > (int) aktState.mario.i + 1; ++i) {
+            for (int j = (int) aktState.mario.j - 1; j > (int) aktState.mario.j + 1; ++j) {
+              minimap[i][j] = aktState.map[i][j];
             }
           }
 
           if (aktState.mario.i >= (double) 11.0F) {
-            if (var23[2][1] == 0 || var23[2][2] == 0) {
+            if (minimap[2][1] == 0 || minimap[2][2] == 0) {
               f += 10.0F;
             }
 
-            if (var23[2][1] != 0 || var23[2][2] != 0 || var23[2][0] != 0) {
+            if (minimap[2][1] != 0 || minimap[2][2] != 0 || minimap[2][0] != 0) {
               f -= 10.0F;
             }
           }
