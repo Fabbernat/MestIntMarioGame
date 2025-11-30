@@ -141,9 +141,9 @@ public class Agent extends MarioPlayer {
      */
     double tavolsag = Math.max(0, 50 - state.mario.j); // nem negativ
     double tavolsagPontszam = Math.max(0, mainGoal - state.score); // nem negativ
-    double ajandekTavolsag = closestBlock(state);
+    double ajandekTavolsag = legkozelebbiBlock(state);
 
-    double[] ertekek = {0.7, 0.5, 0.5};
+    double[] ertekek = {0.5, 0.19, 0.5};
     if (ajandekTavolsag > 100) ajandekTavolsag = 100; // maximalizaljuk
     return ajandekTavolsag * ertekek[0] + tavolsag * ertekek[1] + tavolsagPontszam * ertekek[2];
   }
@@ -193,7 +193,7 @@ public class Agent extends MarioPlayer {
    * @param state A jatekallapot
    * @return A legkisebb talalt tavolsag, vagy nagy ertek ha nincs ilyen elem
    */
-  Double closestBlock(MarioState state) {
+  Double legkozelebbiBlock(MarioState state) {
     double dist = 1000;
     Pont legjobb = null;
     try {
