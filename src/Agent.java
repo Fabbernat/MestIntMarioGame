@@ -5,23 +5,24 @@ import game.mario.utils.MarioState;
 
 import java.util.*;
 
-/** Agent osztaly, amely a jatekban Mario donteseit hozza meg.
+/**
+ * Agent osztaly, amely a jatekban Mario donteseit hozza meg.
  * A jatek celja eljutni a palya jobb oldalara, kerulve a lyukakat,
  * felveve az utba eso ermeket es meglepetes blokkokat.
- *
+ * <p>
  * Az A* keresest alkalmazom egy lecsokkentett allapotteren belul annak erdekeben,
  * hogy Mariot biztonsagos es pontszerzo uton vezessem elore.
- *
+ * <p>
  * A donteseket a getDirection() metodusban hozzom meg, amely a palya
  * aktualis allapotarol eltero heuriztikus ertekeles alapjan
  * kivalaszt egy akciot.
- *
+ * <p>
  * A megvalositott algoritmus legfontosabb elemei:
  * - egy allapotot reprezentalo Csomo osztaly,
  * - heuriztikus tavolsagbecsles (heurisztika),
  * - segedfuggvenyek kozelben levo blokkok felderitesere,
  * - akciok string-alapu leirasa es iranyokkra bontasa.
- *
+ * <p>
  * A kod nem vegez fajlmuveleteket, nem indit uj szalat, es nem ir
  * a kepernyore, megfelelve a feladat kiiras kovetelmenyeinek.
  */
@@ -46,7 +47,7 @@ public class Agent extends MarioPlayer {
   /**
    * A lehetseges akciokat leiro string-elemek.
    * Ezek kombinaciokat reprezentalnak (pl. "SR" = 2 lepest jobb fele).
-   *
+   * <p>
    * A karakterek jelentese:
    * V: nagyon kis lepes (1 lepest jelent)
    * S: kis lepes (2 lepes)
@@ -63,7 +64,8 @@ public class Agent extends MarioPlayer {
   };
 
 
-  /** Csomo osztaly, amelyet az A* kereso algoritmus hasznal a
+  /**
+   * Csomo osztaly, amelyet az A* kereso algoritmus hasznal a
    * palya allapotteren valo tervezeshez. Egy graf csucsat reprezentalja,
    * hivatkozassal a szulo csucsra, a mozgas iranyara es a koltseg ertekekre.
    */
@@ -77,11 +79,12 @@ public class Agent extends MarioPlayer {
 
 
     /**
-     *A graf egy adott csucspontja
-     * @param parent Kitol jutottunk ide
-     * @param state Milyen allapotban vagyunk
+     * A graf egy adott csucspontja
+     *
+     * @param parent    Kitol jutottunk ide
+     * @param state     Milyen allapotban vagyunk
      * @param direction Milyen iranybol jottunk
-     * @param g,h,f g: eddigi utkoltseg, h: hatralevo tavolsag, f: osszkoltseg
+     * @param g,h,f     g: eddigi utkoltseg, h: hatralevo tavolsag, f: osszkoltseg
      *
      */
     public Csomo(double g, double h, Csomo parent, MarioState state, String direction) {
@@ -90,11 +93,12 @@ public class Agent extends MarioPlayer {
       this.direction = direction;
       this.g = g;
       this.h = h;
-      this.f = h+g;
+      this.f = h + g;
 
     }
+
     /**
-     *2 Csomo osszehasonlitasa f szerint
+     * 2 Csomo osszehasonlitasa f szerint
      */
     @Override
     public int compareTo(Csomo n) {
@@ -104,11 +108,13 @@ public class Agent extends MarioPlayer {
 
   float mainGoal = 2000;
   float minDistToReach = 40;
+
   /**
-   *Tavolsag szamitashoz helper osztaly
+   * Tavolsag szamitashoz helper osztaly
    */
   static class Pont {
     double x, y;
+
     public Pont(double x, double y) {
       this.x = x;
       this.y = y;
@@ -123,6 +129,7 @@ public class Agent extends MarioPlayer {
    * - a jelenlegi pontszamot a kivant maximalis ertekhez kepest,
    * - a legkozelebbi meglepetesblokk (SURPRISE) tavolsagat,
    * - es normalizalast a tul nagy ertekek elkerulese erdekeben.
+   *
    * @param state a vizsgalt jatekallapot
    * @return egy nem negativ lebegopontos ertek, amely a becsult hatralevo koltseg
    */
@@ -136,8 +143,9 @@ public class Agent extends MarioPlayer {
     double tavolsagPontszam = Math.max(0, mainGoal - state.score); // nem negativ
     double ajandekTavolsag = closestBlock(state);
 
+    double[] ertekek = {0.7, 0.5, 0.5};
     if (ajandekTavolsag > 100) ajandekTavolsag = 100; // maximalizaljuk
-    return ajandekTavolsag *0.6 + tavolsag*0.5 + tavolsagPontszam*0.5;
+    return ajandekTavolsag * ertekek[0] + tavolsag * ertekek[1] + tavolsagPontszam * ertekek[2];
   }
 
 
@@ -169,8 +177,8 @@ public class Agent extends MarioPlayer {
           }
         }
       }
+    } catch (Exception ignored) {
     }
-    catch (Exception ignored) {}
 
     return tavolsag;
   }
@@ -190,59 +198,66 @@ public class Agent extends MarioPlayer {
     Pont legjobb = null;
     try {
       Pont mario = new Pont(state.mario.j, state.mario.i);
-      for(int i = (int)state.mario.i; i >(int)state.mario.i-4; i--) {
-        for(int j =  (int)state.mario.j; j< (int)state.mario.j+4; j++) {
-          if(state.map[i][j] == MarioGame.SURPRISE) {
+      for (int i = (int) state.mario.i; i > (int) state.mario.i - 4; i--) {
+        for (int j = (int) state.mario.j; j < (int) state.mario.j + 4; j++) {
+          if (state.map[i][j] == MarioGame.SURPRISE) {
             Pont b = new Pont(j, i);
 
-            double x2 = (b.x-mario.x)*(b.x-mario.x);
-            double y2 = (b.y-mario.y)*(b.y-mario.y);
-            double ujTavolsag = Math.abs(x2+y2);
-            if(ujTavolsag<dist) {
+            double x2 = (b.x - mario.x) * (b.x - mario.x);
+            double y2 = (b.y - mario.y) * (b.y - mario.y);
+            double ujTavolsag = Math.abs(x2 + y2);
+            if (ujTavolsag < dist) {
               dist = ujTavolsag;
               legjobb = b;
             }
           }
         }
-      }}
-    catch (Exception ignored) {}
+      }
+    } catch (Exception ignored) {
+    }
 
     return dist;
   }
 
   /**
    * Atalakitom a megkapott irany Strignet Directionne es egy listaban visszaadjuk.
+   *
    * @return List<Direction>
    */
   List<Direction> atalakito(String dir) {
     List<Direction> directions = new ArrayList<>();
     int db = 4;
-    if(dir.contains("S")) {db = 2;}
-    if(dir.contains("V")) {db = 1;}
-    if(dir.contains("R")) {
-      for(int i = 0; i < db; i++) {
+    if (dir.contains("S")) {
+      db = 2;
+    }
+    if (dir.contains("V")) {
+      db = 1;
+    }
+    if (dir.contains("R")) {
+      for (int i = 0; i < db; i++) {
         directions.add(new Direction(MarioGame.RIGHT));
       }
     }
-    if(dir.contains("L")) {
-      for(int i = 0; i <db; i++) {
+    if (dir.contains("L")) {
+      for (int i = 0; i < db; i++) {
         directions.add(new Direction(MarioGame.LEFT));
       }
     }
-    if(dir.contains("U") || dir.equals("UP")) {
-      for(int i = 0; i <db; i++) {
+    if (dir.contains("U") || dir.equals("UP")) {
+      for (int i = 0; i < db; i++) {
         directions.add(new Direction(MarioGame.UP));
       }
 
 
     }
-    if(dir.contains("N") || dir.isEmpty()) {
+    if (dir.contains("N") || dir.isEmpty()) {
       directions.add(null);
 
     }
 
-    return  directions;
+    return directions;
   }
+
   /**
    * @param maxDepth milyen sokaig menjen le az kereses
    * @param depth jelenlegi melyseg
@@ -250,7 +265,6 @@ public class Agent extends MarioPlayer {
    */
   double maxDepth = 1000;
   double depth = 0;
-
 
 
   List<Direction> aStar(MarioState start) {
@@ -273,12 +287,12 @@ public class Agent extends MarioPlayer {
     while (!elerhetoUtak.isEmpty()) {
       depth++;
       Csomo jelenlegiCsomo = elerhetoUtak.poll();
-      if(celE(jelenlegiCsomo) || depth >maxDepth) {
+      if (celE(jelenlegiCsomo) || depth > maxDepth) {
         depth = 0;
         return ut(jelenlegiCsomo);
       }
-      double elozoTavolsag = MarioGame.W+1-jelenlegiCsomo.state.mario.j;
-      for(String akcio : akciok) {
+      double elozoTavolsag = MarioGame.W + 1 - jelenlegiCsomo.state.mario.j;
+      for (String akcio : akciok) {
         MarioState state = new MarioState(jelenlegiCsomo.state);
         double tileKoltseg = 1;
 
@@ -287,7 +301,7 @@ public class Agent extends MarioPlayer {
          **/
 
 
-        tileKoltseg += Math.min(1, 1/ legkozelebbiGodor(state)); // max 1 extra
+        tileKoltseg += Math.min(1, 1 / legkozelebbiGodor(state)); // max 1 extra
 
 
         try {
@@ -295,8 +309,8 @@ public class Agent extends MarioPlayer {
           /**
            * @param kornyezet, mario a kozepe
            **/
-          for(int i = (int)state.mario.i-1; i > (int)state.mario.i+1; i++) {
-            for(int j = (int)state.mario.j-1; j > (int)state.mario.j+1; j++) {
+          for (int i = (int) state.mario.i - 1; i > (int) state.mario.i + 1; i++) {
+            for (int j = (int) state.mario.j - 1; j > (int) state.mario.j + 1; j++) {
               kornyezet[i][j] = state.map[i][j];
             }
           }
@@ -304,41 +318,47 @@ public class Agent extends MarioPlayer {
 /**
  * Ha egy fal vagy cso van felettunk
  **/
-          if(kornyezet[0][1] == MarioGame.WALL  &&kornyezet[0][2] == MarioGame.WALL || kornyezet[0][1] == MarioGame.PIPE  &&kornyezet[0][2] == MarioGame.PIPE) {
-            tileKoltseg+=1;
+          if (kornyezet[0][1] == MarioGame.WALL && kornyezet[0][2] == MarioGame.WALL || kornyezet[0][1] == MarioGame.PIPE && kornyezet[0][2] == MarioGame.PIPE) {
+            tileKoltseg += 1;
           }
 /**
  * ha 11-es y szinten vagyunk es alattunk Empty van;
  **/
 
-          if(state.mario.i >= 12) {
-            if(kornyezet[2][1] == MarioGame.EMPTY  || kornyezet[2][2]== MarioGame.EMPTY  || kornyezet[2][0]== MarioGame.EMPTY) {
-              tileKoltseg+=1;
+          if (state.mario.i >= 12) {
+            if (kornyezet[2][1] == MarioGame.EMPTY || kornyezet[2][2] == MarioGame.EMPTY || kornyezet[2][0] == MarioGame.EMPTY) {
+              tileKoltseg += 1;
             }
 
 
-            if(kornyezet[2][1] != MarioGame.EMPTY  && kornyezet[2][2]!= MarioGame.EMPTY) {
-              tileKoltseg-=2;
+            if (kornyezet[2][1] != MarioGame.EMPTY && kornyezet[2][2] != MarioGame.EMPTY) {
+              tileKoltseg -= 2;
             }
 
           }
 
-        }catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         try {
-          for(Direction direction : atalakito(akcio)) {
+          for (Direction direction : atalakito(akcio)) {
             /**
              * iranyok hozzaadasa, ha false azt azt jelenti hogy ott meghaltunk
              **/
-            if(state.apply(direction) == false) {tileKoltseg +=100;} ;
+            if (state.apply(direction) == false) {
+              tileKoltseg += 100;
+            }
+            ;
           }
 
-        } catch (Exception ignored) {};
+        } catch (Exception ignored) {
+        }
+        ;
 
         try {
           int[][] kornyezet = new int[3][3];
-          for(int i = (int)state.mario.i-1; i > (int)state.mario.i+1; i++) {
-            for(int j = (int)state.mario.j-1; j > (int)state.mario.j+1; j++) {
+          for (int i = (int) state.mario.i - 1; i > (int) state.mario.i + 1; i++) {
+            for (int j = (int) state.mario.j - 1; j > (int) state.mario.j + 1; j++) {
               kornyezet[i][j] = state.map[i][j];
             }
           }
@@ -347,18 +367,19 @@ public class Agent extends MarioPlayer {
            * Ha mozgasok utan ismet empty van alattunk
            **/
 
-          if(state.mario.i >= 11) {
-            if(kornyezet[2][1] == MarioGame.EMPTY  || kornyezet[2][2]== MarioGame.EMPTY) {
-              tileKoltseg+=10;
+          if (state.mario.i >= 11) {
+            if (kornyezet[2][1] == MarioGame.EMPTY || kornyezet[2][2] == MarioGame.EMPTY) {
+              tileKoltseg += 10;
             }
-            if(kornyezet[2][1] != MarioGame.EMPTY  || kornyezet[2][2]!= MarioGame.EMPTY  || kornyezet[2][0]!= MarioGame.EMPTY) {
-              tileKoltseg-=10;
+            if (kornyezet[2][1] != MarioGame.EMPTY || kornyezet[2][2] != MarioGame.EMPTY || kornyezet[2][0] != MarioGame.EMPTY) {
+              tileKoltseg -= 10;
             }
 
           }
 
           //    if(state.isInAir){tileKoltseg+=0.8;}
-        }catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         /***
          * Ha elotte egy 5 magas fal van akkor ha nincs eleg nagy sebessege ne kozelitse meg
@@ -366,13 +387,18 @@ public class Agent extends MarioPlayer {
          * **/
 
 
-        if(elozoTavolsag >= state.distance) {tileKoltseg+=3;}
+        if (elozoTavolsag >= state.distance) {
+          tileKoltseg += 3;
+        }
         /**
          * Ha nem erte el a kello pontszamot, +koltseg
          **/
 
-        if(state.score <1000) {tileKoltseg +=3;}
-        else if(state.score <2000) {tileKoltseg += 1;}
+        if (state.score < 1000) {
+          tileKoltseg += 3;
+        } else if (state.score < 2000) {
+          tileKoltseg += 1;
+        }
 /**
  * Eltaroljuk a csucspontot, letrehozzuk egy kulcsot, fontos hogy ne legyen tul egyedi. ez alapjan hivatkozunk ra
  **/
@@ -389,6 +415,7 @@ public class Agent extends MarioPlayer {
     }
     return null;
   }
+
   /**
    * A megadott csomoponttol visszafele a parenteken keresztul eljut a root csomopontig, majd az egeszet megforditja
    **/
@@ -397,7 +424,7 @@ public class Agent extends MarioPlayer {
     Csomo jelenlegiCsomo = csomo;
     while (jelenlegiCsomo != null) {
       if (jelenlegiCsomo.direction != null) {
-        for(Direction direction : atalakito(jelenlegiCsomo.direction)) {
+        for (Direction direction : atalakito(jelenlegiCsomo.direction)) {
           ut.add(direction);
         }
       }
@@ -406,12 +433,19 @@ public class Agent extends MarioPlayer {
     Collections.reverse(ut);
     return ut;
   }
+
   /**
    * Ha elertuk a kivant celt igazzal terunk vissza, a celt mindig kicsivel megemeljük.
    **/
   boolean celE(Csomo csomo) {
-    if(csomo.state.score >= mainGoal) { mainGoal+=500; return true;}
-    if(csomo.state.distance >= minDistToReach) {minDistToReach+=20;return true;}
+    if (csomo.state.score >= mainGoal) {
+      mainGoal += 500;
+      return true;
+    }
+    if (csomo.state.distance >= minDistToReach) {
+      minDistToReach += 20;
+      return true;
+    }
     return false;
   }
 
@@ -434,15 +468,17 @@ public class Agent extends MarioPlayer {
   @Override
   public Direction getDirection(long remainingTime) {
 
-    if(lepesek == null || lepesek.isEmpty()) {
+    if (lepesek == null || lepesek.isEmpty()) {
 
       lepesek = aStar(state);
     }
-    if(lepesek == null || lepesek.isEmpty()) {
+    if (lepesek == null || lepesek.isEmpty()) {
       return null;
     }
     Direction direction = lepesek.remove(0);
-    try {    state.apply(direction);} catch (Exception ignored) {
+    try {
+      state.apply(direction);
+    } catch (Exception ignored) {
 
     }
 
