@@ -17,10 +17,10 @@ import java.util.*;
  * kivalaszt egy akciot.
  *
  * A megvalositott algoritmus legfontosabb elemei:
- *  - egy allapotot reprezentalo Csomo osztaly,
- *  - heuriztikus tavolsagbecsles (heurisztika),
- *  - segedfuggvenyek kozelben levo blokkok felderitesere,
- *  - akciok string-alapu leirasa es iranyokkra bontasa.
+ * - egy allapotot reprezentalo Csomo osztaly,
+ * - heuriztikus tavolsagbecsles (heurisztika),
+ * - segedfuggvenyek kozelben levo blokkok felderitesere,
+ * - akciok string-alapu leirasa es iranyokkra bontasa.
  *
  * A kod nem vegez fajlmuveleteket, nem indit uj szalat, es nem ir
  * a kepernyore, megfelelve a feladat kiiras kovetelmenyeinek.
@@ -48,12 +48,12 @@ public class Agent extends MarioPlayer {
    * Ezek kombinaciokat reprezentalnak (pl. "SR" = 2 lepest jobb fele).
    *
    * A karakterek jelentese:
-   *  V: nagyon kis lepes (1 lepest jelent)
-   *  S: kis lepes (2 lepes)
-   *  R: jobbra mozgasa
-   *  L: balra mozgasa
-   *  U: ugras
-   *  "": nincs akcio
+   * V: nagyon kis lepes (1 lepest jelent)
+   * S: kis lepes (2 lepes)
+   * R: jobbra mozgasa
+   * L: balra mozgasa
+   * U: ugras
+   * "": nincs akcio
    */
   String[] akciok = {
           "VR", "VL",
@@ -116,15 +116,15 @@ public class Agent extends MarioPlayer {
   }
 
   /**
-   * Heurisztikus függvény, amely becslést ad arra,
-   * milyen messze vagyok a céltól.
+   * Heurisztikus fuggveny, amely becslest ad arra,
+   * milyen messze vagyok a celtol.
    * A heurisztika figyelembe veszi
-   *  - a pálya végétől való távolságot,
-   *  - a jelenlegi pontszámot a kívánt maximális értékhez képest,
-   *  - a legközelebbi meglepetésblokk (SURPRISE) távolságát,
-   *  - és normalizálást a túl nagy értékek elkerülése érdekében.
-   * @param state a vizsgált játékállapot
-   * @return egy nem negatív lebegőpontos érték, amely a becsült hátralévő költség
+   * - a palya vegetol valo tavolsagot,
+   * - a jelenlegi pontszamot a kivant maximalis ertekhez kepest,
+   * - a legkozelebbi meglepetesblokk (SURPRISE) tavolsagat,
+   * - es normalizalast a tul nagy ertekek elkerulese erdekeben.
+   * @param state a vizsgalt jatekallapot
+   * @return egy nem negativ lebegopontos ertek, amely a becsult hatralevo koltseg
    */
   double heurisztika(MarioState state) {
     /**
@@ -132,25 +132,25 @@ public class Agent extends MarioPlayer {
      * @param scroteDist a cel scroetol valo tavolsag
      * @param supriseDist a legkozelebbi suprise tavolsaga
      */
-    double tavolsag = Math.max(0, 50 - state.mario.j); // nem negatív
-    double tavolsagPontszam = Math.max(0, mainGoal - state.score); // nem negatív
+    double tavolsag = Math.max(0, 50 - state.mario.j); // nem negativ
+    double tavolsagPontszam = Math.max(0, mainGoal - state.score); // nem negativ
     double ajandekTavolsag = closestBlock(state);
 
-    if (ajandekTavolsag > 100) ajandekTavolsag = 100; // maximalizáljuk
+    if (ajandekTavolsag > 100) ajandekTavolsag = 100; // maximalizaljuk
     return ajandekTavolsag *0.6 + tavolsag*0.5 + tavolsagPontszam*0.5;
   }
 
 
   /**
-   * A legközelebbi lyukhoz (EMPTY mező az alsó sorokban) mért távolságot
-   * becsli. Az ágens elsősorban azért használja, hogy elkerülje az olyan
-   * akciókat, amelyek közvetlenül veszélyes területre vezetnének.
+   * A legkozelebbi lyukhoz (EMPTY mezo az also sorokban) mert tavolsagot
+   * becsli. Az agens elsorban azert hasznalja, hogy elkerulje az olyan
+   * akciokat, amelyek kozvetlenul veszelyes teruletre vezetnenek.
    *
-   * <p>A függvény egy szűkített vizsgálati sávban keres a játékos
-   * előtti és körüli területen.</p>
+   * <p>A fuggveny egy szukitett vizsgalati savban keres a jatekos
+   * elotti es koruli teruleten.</p>
    *
-   * @param state A játékállapot
-   * @return A lyukhoz becsült távolság négyzete, vagy nagy érték ha nincs lyuk
+   * @param state A jatekallapot
+   * @return A lyukhoz becsult tavolsag negyzete, vagy nagy ertek ha nincs lyuk
    */
   double legkozelebbiGodor(MarioState state) {
     double tavolsag = 10000;
@@ -177,13 +177,13 @@ public class Agent extends MarioPlayer {
 
 
   /**
-   * Megkeresi az adott tipusu elem (pl. SURPRISE, COIN) legkozelebbi Mario-tól jobbra eső előfordulását.
+   * Megkeresi az adott tipusu elem (pl. SURPRISE, COIN) legkozelebbi Mario-tol jobbra eso elofordulasat.
    *
-   * <p>A keresés vízszintesen előre történik, függőleges szinten
-   * pedig a játékos aktuális pozíciója körül vizsgálunk.</p>
+   * <p>A kereses vizszintesen elore tortenik, fuggoleges szinten
+   * pedig a jatekos aktualis pozicioja korul vizsgalunk.</p>
    *
-   * @param state A játékállapot
-   * @return A legkisebb talált távolság, vagy nagy érték ha nincs ilyen elem
+   * @param state A jatekallapot
+   * @return A legkisebb talalt tavolsag, vagy nagy ertek ha nincs ilyen elem
    */
   Double closestBlock(MarioState state) {
     double dist = 1000;
@@ -264,7 +264,7 @@ public class Agent extends MarioPlayer {
     Csomo elsoCsomopont = new Csomo(start.distance, MarioGame.W, null, start, null);
     elerhetoUtak.add(elsoCsomopont);
     /**
-     * Az elerheto utakhoz hozzáadjuk az első kiindulo csucsot
+     * Az elerheto utakhoz hozzaadjuk az elso kiindulo csucsot
      * Kivesszuk az openbol
      * Megnezzuk hogy elertuk e a celunkat, vagy a melyseget, ha igen visszaadjuk az ide vezeto utat
      * Kiterjesztjuk a jelenlegi csucspontunkat, az `akciok` osszes utjara leuttatjuk az adott allapotot
@@ -361,14 +361,14 @@ public class Agent extends MarioPlayer {
         }catch (Exception ignored) {}
 
         /***
-         * Ha elötte egy 5 magas fal van akkor ha nincs elég nagy sebessége ne közelítse meg
+         * Ha elotte egy 5 magas fal van akkor ha nincs eleg nagy sebessege ne kozelitse meg
          *
          * **/
 
 
         if(elozoTavolsag >= state.distance) {tileKoltseg+=3;}
         /**
-         * Ha nem erte el a kello pontszámot, +koltseg
+         * Ha nem erte el a kello pontszamot, +koltseg
          **/
 
         if(state.score <1000) {tileKoltseg +=3;}
@@ -390,7 +390,7 @@ public class Agent extends MarioPlayer {
     return null;
   }
   /**
-   * A megadott csomoponttol visszafele a parenteken keresztul eljut a root csomopontig, majd az egeszet megfordítja
+   * A megadott csomoponttol visszafele a parenteken keresztul eljut a root csomopontig, majd az egeszet megforditja
    **/
   List<Direction> ut(Csomo csomo) {
     List<Direction> ut = new ArrayList<>();
@@ -407,7 +407,7 @@ public class Agent extends MarioPlayer {
     return ut;
   }
   /**
-   * Ha elertük a kívant celt igazzal terunk vissza, a celt mindig kicsivel megemeljük.
+   * Ha elertuk a kivant celt igazzal terunk vissza, a celt mindig kicsivel megemeljük.
    **/
   boolean celE(Csomo csomo) {
     if(csomo.state.score >= mainGoal) { mainGoal+=500; return true;}
@@ -418,18 +418,18 @@ public class Agent extends MarioPlayer {
   List<Direction> lepesek = new ArrayList<>();
 
   /**
-   * A játék minden lépésében meghívott függvény, amely kiválasztja
-   * Mario következő irányát. A döntés alapja:
-   *  - heurisztikus becslés a pálya végéig,
-   *  - potenciális veszélyek (lyukak, falak) felmérése,
-   *  - pontszerzési lehetőségek feltérképezése,
-   *  - A* keresés egy rövid mélységű tervezési térben.
+   * A jatek minden lepeseben meghivott fuggveny, amely kivalasztja
+   * Mario kovetkezo iranyat. A dontes alapja:
+   * - heurisztikus becsles a palya vegeig,
+   * - potencialis veszelyek (lyukak, falak) felmerese,
+   * - pontszerzesi lehetosegek felterkepezese,
+   * - A* kereses egy rovid melysegu tervezesi terben.
    *
-   * <p>A módszer végül egy Direction objektumot ad vissza,
-   * amelyet a keretrendszer közvetlenül végrehajt.</p>
+   * <p>A modszer vegul egy Direction objektumot ad vissza,
+   * amelyet a keretrendszer kozvetlenul vegrehajt.</p>
    *
-   * @param remainingTime A lépés meghozatalára rendelkezésre álló idő (ms)
-   * @return A választott irány a Direction enum segítségével
+   * @param remainingTime A lepes meghozatalara rendelkezesre allo ido (ms)
+   * @return A valasztott irany a Direction enum segitsegevel
    */
   @Override
   public Direction getDirection(long remainingTime) {
