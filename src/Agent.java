@@ -128,9 +128,9 @@ public class Agent extends MarioPlayer {
    */
   double heurisztika(MarioState state) {
     /**
-     * @param tavolsag a vegtol valo tavolsagunk
-     * @param scroteDist a cel scroetol valo tavolsag
-     * @param supriseDist a legkozelebbi suprise tavolsaga
+     * @param tavolsag a palya vegetol valo tavolsagunk
+     * @param tavolsagPontszam a cel pontszamtol valo tavolsag
+     * @param ajandekTavolsag a legkozelebbi suprise tavolsaga
      */
     double tavolsag = Math.max(0, 50 - state.mario.j); // nem negativ
     double tavolsagPontszam = Math.max(0, mainGoal - state.score); // nem negativ
